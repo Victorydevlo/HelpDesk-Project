@@ -863,10 +863,13 @@ function TicketDetail({ t, isDark, ticket, now, settings, detailTab, setDetailTa
               ))}
             </div>
             <div className="flex items-end gap-2">
-              <textarea value={replyText} onChange={(e) => setReplyText(e.target.value)} rows={2} placeholder="Type a reply to the requester…"
+              <textarea value={replyText} onChange={(e) => setReplyText(e.target.value)} rows={2}
+                placeholder={aiTyping ? "Waiting for a reply…" : "Type a reply to the requester…"} disabled={aiTyping}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendReply(ticket.id); } }}
-                className={`flex-1 resize-none rounded-lg border px-3 py-2 text-sm outline-none ${t.input}`} />
-              <button onClick={() => sendReply(ticket.id)} className="p-2.5 rounded-lg bg-cyan-500 text-slate-950"><Send size={16} /></button>
+                className={`flex-1 resize-none rounded-lg border px-3 py-2 text-sm outline-none disabled:opacity-60 ${t.input}`} />
+              <button onClick={() => sendReply(ticket.id)} disabled={aiTyping} className="p-2.5 rounded-lg bg-cyan-500 text-slate-950 disabled:opacity-50">
+                {aiTyping ? <RefreshCw size={16} className="animate-spin" /> : <Send size={16} />}
+              </button>
             </div>
           </div>
         </>
