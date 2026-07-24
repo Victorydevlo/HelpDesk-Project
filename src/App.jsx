@@ -161,6 +161,29 @@ const FALLBACK_CALL_LINES = [
 ];
 
 /* ---------------------------------------------------------------------- */
+/*  L2 SUPPORT TIER — infrastructure + escalation config                 */
+/* ---------------------------------------------------------------------- */
+
+const INFRA_SERVICES = [
+  { id: "svc-1", name: "AUTH-PROD-01", type: "Authentication / SSO", icon: "server" },
+  { id: "svc-2", name: "EXCH-MBX-03", type: "Exchange mailbox server", icon: "server" },
+  { id: "svc-3", name: "FS01", type: "Finance file server", icon: "database" },
+  { id: "svc-4", name: "VPN-GW-EAST", type: "VPN gateway", icon: "server" },
+  { id: "svc-5", name: "CI-RUNNER-04", type: "Deploy pipeline runner", icon: "server" },
+  { id: "svc-6", name: "DNS01", type: "Internal DNS", icon: "database" },
+];
+
+function seedInfra() {
+  return INFRA_SERVICES.map((s, i) => ({
+    ...s,
+    status: i === 2 ? "Degraded" : "Online",
+    cpu: 20 + Math.floor(Math.random() * 30),
+    mem: 30 + Math.floor(Math.random() * 40),
+    uptime: `${3 + i}d ${Math.floor(Math.random() * 24)}h`,
+  }));
+}
+
+/* ---------------------------------------------------------------------- */
 /*  THEME TOKENS                                                          */
 /* ---------------------------------------------------------------------- */
 
