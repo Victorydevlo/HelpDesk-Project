@@ -25,6 +25,7 @@ const CATEGORY_ICON = {
   Network: Wifi, "Account Access": KeyRound, Hardware: HardDrive,
   Software: Laptop, Security: ShieldAlert, Permissions: FileText,
   "Software Request": Laptop, Onboarding: Users, Email: Mail, Print: Printer,
+  "Phone Call": Phone,
 };
 
 const MACROS = [
