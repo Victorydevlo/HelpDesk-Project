@@ -315,6 +315,8 @@ export default function HelpdeskSimulator() {
   const [callMuted, setCallMuted] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [now, setNow] = useState(Date.now());
+  const [infra, setInfra] = useState(() => seedInfra());
+  const [infraLog, setInfraLog] = useState([]);
   const termEndRef = useRef(null);
   const chatEndRef = useRef(null);
   const callEndRef = useRef(null);
