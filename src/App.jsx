@@ -417,3 +417,181 @@ export default function HelpdeskSimulator() {
     setTermHistory((h) => [...h, { type: "in", text: cmd }, ...out.map((line) => ({ type: "out", text: line }))]);
   }
 
+  /* ---------- filtered queue ---------- */
+  const filteredTickets = useMemo(() => {
+    return tickets
+      .filter((tk) => queueFilter === "All" || tk.status === queueFilter)
+      .filter((tk) => {
+        const q = queueSearch.toLowerCase();
+        if (!q) return true;
+        return tk.subject.toLowerCase().includes(q) || tk.requester.toLowerCase().includes(q) || tk.id.toLowerCase().includes(q);
+      })
+      .sort((a, b) => PRIORITY_META[a.priority].order - PRIORITY_META[b.priority].order || new Date(a.dueAt) - new Date(b.dueAt));
+  }, [tickets, queueFilter, queueSearch]);
+
+  const filteredKb = useMemo(() => {
+    const q = kbQuery.toLowerCase();
+    if (!q) return KB_ARTICLES;
+    return KB_ARTICLES.filter((a) => a.title.toLowerCase().includes(q) || a.category.toLowerCase().includes(q) || a.snippet.toLowerCase().includes(q));
+  }, [kbQuery]);
+
+  async function resetSimulation() {
+    const fresh = seedTickets();
+    setTickets(fresh);
+    setSelectedId(null);
+    try { await window.storage.set("relay-helpdesk-state", JSON.stringify({ tickets: fresh, settings }), false); } catch (e) {}
+    pushToast("Simulation data reset", "success");
+  }
+
+  if (!ready) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center ${theme(true).appBg} ${theme(true).text}`}>
+        <div className="flex items-center gap-2 font-mono text-sm"><RefreshCw size={16} className="animate-spin" /> Loading RELAY console…</div>
+      </div>
+    );
+  }
+
+  const NAV = [
+    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { id: "queue", label: "Queue", icon: Inbox },
+    { id: "kb", label: "Knowledge Base", icon: BookOpen },
+    { id: "diagnostics", label: "Diagnostics", icon: Terminal },
+    { id: "settings", label: "Settings", icon: SettingsIcon },
+  ];
+
+  return (
+    <div className={`min-h-screen w-full ${t.appBg} ${t.text} ${fontSizeClass}`} style={{ fontFamily: "Inter, system-ui, sans-serif" }}>
+      {/* TOASTS */}
+      <div className="fixed top-3 right-3 z-50 flex flex-col gap-2 w-72">
+        {toasts.map((tst) => (
+          <div key={tst.id} className={`px-3 py-2 rounded-lg text-sm shadow-lg border ${t.panel} ${t.border} flex items-center gap-2`}>
+            {tst.kind === "success" ? <CheckCircle2 size={14} className="text-emerald-500" /> : <Bell size={14} className="text-cyan-500" />}
+            {tst.msg}
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-col md:flex-row min-h-screen">
+        {/* DESKTOP SIDEBAR */}
+        <aside className={`hidden md:flex md:flex-col md:w-56 shrink-0 border-r ${t.border} ${t.panel}`}>
+          <div className={`px-4 py-4 border-b ${t.border} flex items-center gap-2`}>
+            <div className="w-7 h-7 rounded bg-cyan-500 flex items-center justify-center text-slate-950 font-bold text-xs font-mono">R/</div>
+            <div>
+              <div className="font-semibold text-sm leading-none">RELAY</div>
+              <div className={`text-[11px] ${t.textFaint} font-mono`}>Helpdesk Simulator</div>
+            </div>
+          </div>
+          <nav className="flex-1 px-2 py-3 space-y-1">
+            {NAV.map((n) => (
+              <button key={n.id} onClick={() => { setScreen(n.id); setSelectedId(null); }}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${screen === n.id ? `${t.active} font-medium` : `${t.hover} ${t.textMuted}`}`}>
+                <n.icon size={16} /> {n.label}
+                {n.id === "queue" && metrics.breached > 0 && <span className="ml-auto text-[10px] font-mono bg-rose-500 text-white rounded-full px-1.5 py-0.5">{metrics.breached}</span>}
+              </button>
+            ))}
+          </nav>
+          <div className={`px-3 py-3 border-t ${t.border}`}>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center"><User size={14} className="text-cyan-500" /></div>
+              <div className="min-w-0">
+                <div className="text-sm font-medium truncate">{settings.agentName}</div>
+                <div className={`text-[11px] ${t.textFaint}`}>{settings.agentStatus}</div>
+              </div>
+            </div>
+            <button onClick={() => setSettings((s) => ({ ...s, theme: isDark ? "light" : "dark" }))}
+              className={`w-full flex items-center justify-center gap-2 text-xs py-1.5 rounded-lg border ${t.border} ${t.hover}`}>
+              {isDark ? <Sun size={13} /> : <Moon size={13} />} {isDark ? "Light mode" : "Dark mode"}
+            </button>
+          </div>
+        </aside>
+
+        {/* MOBILE TOP BAR */}
+        <header className={`md:hidden flex items-center justify-between px-4 py-3 border-b ${t.border} ${t.panel} sticky top-0 z-30`}>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded bg-cyan-500 flex items-center justify-center text-slate-950 font-bold text-[10px] font-mono">R/</div>
+            <span className="font-semibold text-sm">RELAY</span>
+          </div>
+          <div className="flex items-center gap-3">
+            {metrics.breached > 0 && <span className="flex items-center gap-1 text-[11px] text-rose-500 font-mono"><AlertTriangle size={12} />{metrics.breached}</span>}
+            <button onClick={() => setSettings((s) => ({ ...s, theme: isDark ? "light" : "dark" }))}>{isDark ? <Sun size={17} /> : <Moon size={17} />}</button>
+          </div>
+        </header>
+
+        {/* MAIN CONTENT */}
+        <main className="flex-1 min-w-0 pb-16 md:pb-0">
+          {screen === "dashboard" && (
+            <DashboardScreen t={t} isDark={isDark} metrics={metrics} tickets={tickets} now={now} settings={settings}
+              goQueue={(f) => { setScreen("queue"); setQueueFilter(f || "All"); }} />
+          )}
+
+          {screen === "queue" && (
+            <>
+              {/* Desktop split view */}
+              <div className="hidden md:grid md:grid-cols-[380px_1fr] h-screen">
+                <QueueList t={t} tickets={filteredTickets} selectedId={selectedId} setSelectedId={setSelectedId}
+                  now={now} settings={settings} queueFilter={queueFilter} setQueueFilter={setQueueFilter}
+                  queueSearch={queueSearch} setQueueSearch={setQueueSearch} density={density} />
+                <div className={`border-l ${t.border} overflow-y-auto`}>
+                  {selected ? (
+                    <TicketDetail t={t} isDark={isDark} ticket={selected} now={now} settings={settings}
+                      detailTab={detailTab} setDetailTab={setDetailTab}
+                      replyText={replyText} setReplyText={setReplyText} sendReply={sendReply} aiTyping={aiTyping}
+                      changeStatus={changeStatus} changePriority={changePriority}
+                      noteText={noteText} setNoteText={setNoteText} addNote={addNote}
+                      chatEndRef={chatEndRef} goDiagnostics={() => { setTermTicketId(selected.id); setScreen("diagnostics"); }} />
+                  ) : (
+                    <div className={`h-full flex items-center justify-center ${t.textFaint} text-sm`}>Select a ticket to view details</div>
+                  )}
+                </div>
+              </div>
+              {/* Mobile stacked view */}
+              <div className="md:hidden">
+                {!selected ? (
+                  <QueueList t={t} tickets={filteredTickets} selectedId={selectedId} setSelectedId={setSelectedId}
+                    now={now} settings={settings} queueFilter={queueFilter} setQueueFilter={setQueueFilter}
+                    queueSearch={queueSearch} setQueueSearch={setQueueSearch} density={density} mobile />
+                ) : (
+                  <div>
+                    <button onClick={() => setSelectedId(null)} className={`flex items-center gap-1 px-4 py-3 text-sm ${t.textMuted}`}>
+                      <ArrowLeft size={15} /> Back to queue
+                    </button>
+                    <TicketDetail t={t} isDark={isDark} ticket={selected} now={now} settings={settings}
+                      detailTab={detailTab} setDetailTab={setDetailTab}
+                      replyText={replyText} setReplyText={setReplyText} sendReply={sendReply} aiTyping={aiTyping}
+                      changeStatus={changeStatus} changePriority={changePriority}
+                      noteText={noteText} setNoteText={setNoteText} addNote={addNote}
+                      chatEndRef={chatEndRef} goDiagnostics={() => { setTermTicketId(selected.id); setScreen("diagnostics"); }} />
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {screen === "kb" && (
+            <KbScreen t={t} isDark={isDark} kbQuery={kbQuery} setKbQuery={setKbQuery} filteredKb={filteredKb} openKb={openKb} setOpenKb={setOpenKb} />
+          )}
+
+          {screen === "diagnostics" && (
+            <DiagnosticsScreen t={t} isDark={isDark} tickets={tickets} termTicketId={termTicketId} setTermTicketId={setTermTicketId}
+              termHistory={termHistory} termInput={termInput} setTermInput={setTermInput} runCommand={runCommand} termEndRef={termEndRef} />
+          )}
+
+          {screen === "settings" && (
+            <SettingsScreen t={t} isDark={isDark} settings={settings} setSettings={setSettings} resetSimulation={resetSimulation} pushToast={pushToast} />
+          )}
+        </main>
+      </div>
+
+      {/* MOBILE BOTTOM NAV */}
+      <nav className={`md:hidden fixed bottom-0 left-0 right-0 z-30 border-t ${t.border} ${t.panel} flex justify-around py-2`}>
+        {NAV.map((n) => (
+          <button key={n.id} onClick={() => { setScreen(n.id); setSelectedId(null); }} className={`flex flex-col items-center gap-0.5 px-2 py-1 text-[10px] ${screen === n.id ? "text-cyan-500" : t.textFaint}`}>
+            <n.icon size={19} />
+            {n.label === "Knowledge Base" ? "KB" : n.label}
+          </button>
+        ))}
+      </nav>
+    </div>
+  );
+}
+
