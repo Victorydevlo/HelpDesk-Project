@@ -731,3 +731,126 @@ function QueueList({ t, tickets, selectedId, setSelectedId, now, settings, queue
   );
 }
 
+/* ---------------------------------------------------------------------- */
+/*  TICKET DETAIL                                                        */
+/* ---------------------------------------------------------------------- */
+
+function TicketDetail({ t, isDark, ticket, now, settings, detailTab, setDetailTab, replyText, setReplyText, sendReply, aiTyping,
+  changeStatus, changePriority, noteText, setNoteText, addNote, chatEndRef, goDiagnostics }) {
+  const tabs = [
+    { id: "conversation", label: "Conversation" },
+    { id: "notes", label: `Notes (${ticket.notes.length})` },
+    { id: "details", label: "Details" },
+  ];
+  return (
+    <div className="flex flex-col h-full">
+      <div className={`p-4 border-b ${t.border}`}>
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <span className={`text-xs font-mono ${t.textFaint}`}>{ticket.id}</span>
+          <SlaTimer ticket={ticket} now={now} t={t} warnPct={settings.slaWarnPct} />
+        </div>
+        <h2 className="font-semibold text-base mb-2">{ticket.subject}</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <PriorityBadge priority={ticket.priority} />
+          <StatusBadge status={ticket.status} />
+          <span className={`text-xs ${t.textMuted}`}>{ticket.requester} · {ticket.dept}</span>
+        </div>
+        <div className="flex flex-wrap gap-2 mt-3">
+          <select value={ticket.status} onChange={(e) => changeStatus(ticket.id, e.target.value)}
+            className={`text-xs rounded-lg border px-2 py-1.5 ${t.input}`}>
+            {STATUS_LIST.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select value={ticket.priority} onChange={(e) => changePriority(ticket.id, e.target.value)}
+            className={`text-xs rounded-lg border px-2 py-1.5 ${t.input}`}>
+            {Object.keys(PRIORITY_META).map((p) => <option key={p} value={p}>{p}</option>)}
+          </select>
+          <button onClick={goDiagnostics} className={`text-xs rounded-lg border px-2 py-1.5 flex items-center gap-1 ${t.border} ${t.hover}`}>
+            <Wrench size={12} /> Diagnostics
+          </button>
+        </div>
+      </div>
+
+      <div className={`flex border-b ${t.border} px-2`}>
+        {tabs.map((tb) => (
+          <button key={tb.id} onClick={() => setDetailTab(tb.id)}
+            className={`px-3 py-2.5 text-sm border-b-2 -mb-px ${detailTab === tb.id ? "border-cyan-500 text-cyan-500 font-medium" : "border-transparent " + t.textMuted}`}>
+            {tb.label}
+          </button>
+        ))}
+      </div>
+
+      {detailTab === "conversation" && (
+        <>
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {ticket.thread.map((m) => (
+              <div key={m.id} className={`flex ${m.sender === "agent" ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm ${m.sender === "agent" ? "bg-cyan-500 text-slate-950 rounded-br-sm" : `${isDark ? "bg-slate-800" : "bg-slate-100"} rounded-bl-sm`}`}>
+                  {m.text}
+                  <div className={`text-[10px] mt-1 ${m.sender === "agent" ? "text-slate-950/60" : t.textFaint}`}>{new Date(m.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+                </div>
+              </div>
+            ))}
+            {aiTyping && <div className={`text-xs ${t.textFaint} italic`}>{ticket.requester} is typing…</div>}
+            <div ref={chatEndRef} />
+          </div>
+          <div className={`p-3 border-t ${t.border}`}>
+            <div className="flex gap-1.5 overflow-x-auto no-scrollbar mb-2">
+              {MACROS.map((mc) => (
+                <button key={mc.label} onClick={() => setReplyText(mc.text)}
+                  className={`shrink-0 text-[11px] px-2 py-1 rounded-full border ${t.border} ${t.hover} ${t.textMuted}`}>{mc.label}</button>
+              ))}
+            </div>
+            <div className="flex items-end gap-2">
+              <textarea value={replyText} onChange={(e) => setReplyText(e.target.value)} rows={2} placeholder="Type a reply to the requester…"
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendReply(ticket.id); } }}
+                className={`flex-1 resize-none rounded-lg border px-3 py-2 text-sm outline-none ${t.input}`} />
+              <button onClick={() => sendReply(ticket.id)} className="p-2.5 rounded-lg bg-cyan-500 text-slate-950"><Send size={16} /></button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {detailTab === "notes" && (
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="space-y-2 mb-4">
+            {ticket.notes.length === 0 && <div className={`text-sm ${t.textFaint}`}>No internal notes yet. Notes are visible to agents only.</div>}
+            {ticket.notes.map((n) => (
+              <div key={n.id} className={`p-3 rounded-lg border ${t.border} ${isDark ? "bg-amber-500/5" : "bg-amber-50"}`}>
+                <div className="flex items-center gap-1.5 mb-1"><StickyNote size={12} className="text-amber-500" /><span className={`text-[10px] ${t.textFaint}`}>{new Date(n.time).toLocaleString()}</span></div>
+                <div className="text-sm">{n.text}</div>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder="Add an internal note…"
+              onKeyDown={(e) => e.key === "Enter" && addNote(ticket.id)}
+              className={`flex-1 rounded-lg border px-3 py-2 text-sm outline-none ${t.input}`} />
+            <button onClick={() => addNote(ticket.id)} className={`px-3 rounded-lg border text-sm ${t.border} ${t.hover}`}>Add</button>
+          </div>
+        </div>
+      )}
+
+      {detailTab === "details" && (
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div>
+            <h3 className={`text-xs uppercase tracking-wide ${t.textFaint} mb-1.5`}>Description</h3>
+            <p className="text-sm">{ticket.description}</p>
+          </div>
+          <div>
+            <h3 className={`text-xs uppercase tracking-wide ${t.textFaint} mb-1.5`}>Device</h3>
+            <div className={`text-sm font-mono space-y-0.5 p-3 rounded-lg border ${t.border} ${t.panelAlt}`}>
+              <div>Hostname: {ticket.device.host}</div>
+              <div>OS: {ticket.device.os}</div>
+              <div>IP: {ticket.device.ip}</div>
+            </div>
+          </div>
+          <div>
+            <h3 className={`text-xs uppercase tracking-wide ${t.textFaint} mb-1.5`}>Assignment</h3>
+            <div className="text-sm">{ticket.assigned} · Created {timeAgo(ticket.createdAt, now)}</div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
