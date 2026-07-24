@@ -118,3 +118,40 @@ const FALLBACK_REPLIES = [
   "Thanks, I'll try that and let you know.",
 ];
 
+/* ---------------------------------------------------------------------- */
+/*  THEME TOKENS                                                          */
+/* ---------------------------------------------------------------------- */
+
+function theme(isDark) {
+  return {
+    appBg: isDark ? "bg-slate-950" : "bg-slate-100",
+    panel: isDark ? "bg-slate-900" : "bg-white",
+    panelAlt: isDark ? "bg-slate-900/60" : "bg-slate-50",
+    border: isDark ? "border-slate-800" : "border-slate-200",
+    text: isDark ? "text-slate-100" : "text-slate-900",
+    textMuted: isDark ? "text-slate-400" : "text-slate-500",
+    textFaint: isDark ? "text-slate-500" : "text-slate-400",
+    hover: isDark ? "hover:bg-slate-800" : "hover:bg-slate-100",
+    active: isDark ? "bg-slate-800" : "bg-slate-200",
+    accent: "text-cyan-500",
+    accentBg: isDark ? "bg-cyan-500" : "bg-cyan-600",
+    input: isDark ? "bg-slate-800 border-slate-700 text-slate-100 placeholder-slate-500" : "bg-white border-slate-300 text-slate-900 placeholder-slate-400",
+    ring: isDark ? "focus:ring-cyan-500" : "focus:ring-cyan-600",
+  };
+}
+
+const PRIORITY_COLORS = {
+  Critical: { dot: "bg-rose-500", text: "text-rose-500", bg: "bg-rose-500/10", ring: "ring-rose-500/30" },
+  High: { dot: "bg-amber-500", text: "text-amber-500", bg: "bg-amber-500/10", ring: "ring-amber-500/30" },
+  Medium: { dot: "bg-sky-500", text: "text-sky-500", bg: "bg-sky-500/10", ring: "ring-sky-500/30" },
+  Low: { dot: "bg-emerald-500", text: "text-emerald-500", bg: "bg-emerald-500/10", ring: "ring-emerald-500/30" },
+};
+
+const STATUS_COLORS = {
+  New: { text: "text-cyan-500", bg: "bg-cyan-500/10" },
+  Open: { text: "text-amber-500", bg: "bg-amber-500/10" },
+  Pending: { text: "text-violet-500", bg: "bg-violet-500/10" },
+  Resolved: { text: "text-emerald-500", bg: "bg-emerald-500/10" },
+  Closed: { text: "text-slate-400", bg: "bg-slate-500/10" },
+};
+
