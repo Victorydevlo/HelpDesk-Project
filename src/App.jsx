@@ -281,6 +281,7 @@ export default function HelpdeskSimulator() {
   const [now, setNow] = useState(Date.now());
   const termEndRef = useRef(null);
   const chatEndRef = useRef(null);
+  const callEndRef = useRef(null);
 
   const isDark = settings.theme === "dark";
   const t = theme(isDark);
