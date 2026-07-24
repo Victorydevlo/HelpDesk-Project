@@ -155,3 +155,55 @@ const STATUS_COLORS = {
   Closed: { text: "text-slate-400", bg: "bg-slate-500/10" },
 };
 
+/* ---------------------------------------------------------------------- */
+/*  SMALL UI PARTS                                                        */
+/* ---------------------------------------------------------------------- */
+
+function Badge({ children, className = "" }) {
+  return <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${className}`}>{children}</span>;
+}
+
+function PriorityBadge({ priority }) {
+  const c = PRIORITY_COLORS[priority];
+  return <Badge className={`${c.bg} ${c.text}`}><span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />{priority}</Badge>;
+}
+
+function StatusBadge({ status }) {
+  const c = STATUS_COLORS[status];
+  return <Badge className={`${c.bg} ${c.text}`}>{status}</Badge>;
+}
+
+function SlaTimer({ ticket, now, t, warnPct }) {
+  if (ticket.status === "Resolved" || ticket.status === "Closed") {
+    return <span className={`text-xs font-mono ${t.textFaint}`}>SLA closed</span>;
+  }
+  const due = new Date(ticket.dueAt).getTime();
+  const created = new Date(ticket.createdAt).getTime();
+  const total = due - created;
+  const remaining = due - now;
+  const pctElapsed = Math.min(100, Math.max(0, ((now - created) / total) * 100));
+  const breached = remaining <= 0;
+  const warning = !breached && pctElapsed >= warnPct;
+  const abs = Math.abs(remaining);
+  const h = Math.floor(abs / 3600000);
+  const m = Math.floor((abs % 3600000) / 60000);
+  const s = Math.floor((abs % 60000) / 1000);
+  const label = `${h > 0 ? h + "h " : ""}${m}m ${s}s`;
+  const color = breached ? "text-rose-500" : warning ? "text-amber-500" : "text-emerald-500";
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs font-mono ${color}`}>
+      <Timer size={12} /> {breached ? `BREACHED ${label} ago` : `${label} left`}
+    </span>
+  );
+}
+
+function timeAgo(iso, now) {
+  const diff = now - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
