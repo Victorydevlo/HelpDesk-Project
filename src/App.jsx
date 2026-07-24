@@ -380,6 +380,20 @@ export default function HelpdeskSimulator() {
     pushToast(`${reason === "declined" ? "Declined" : "Missed"} call from ${call.caller} logged as ${ticket.id}`, reason === "declined" ? "info" : "success");
   }
 
+  function acceptCall() {
+    if (!incomingCall) return;
+    setActiveCall({ ...incomingCall, transcript: [{ id: Math.random().toString(36).slice(2), sender: "caller", text: incomingCall.issue, time: new Date().toISOString() }], startedAt: Date.now() });
+    setIncomingCall(null);
+    setCallMuted(false);
+    setScreen("call");
+  }
+
+  function declineCall() {
+    if (!incomingCall) return;
+    logUnanswered(incomingCall, "declined");
+    setIncomingCall(null);
+  }
+
   const selected = tickets.find((tk) => tk.id === selectedId) || null;
 
   /* ---------- derived metrics ---------- */
