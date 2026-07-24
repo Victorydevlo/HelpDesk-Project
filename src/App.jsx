@@ -1227,3 +1227,149 @@ function IncomingCallModal({ t, isDark, call, onAccept, onDecline }) {
     </div>
   );
 }
+
+function ActiveCallScreen({ t, isDark, call, now, callInput, setCallInput, sendCallMessage, callSending, callMuted, setCallMuted, endCall, callEndRef }) {
+  const priority = priorityForRole(call.title);
+  return (
+    <div className={`fixed inset-0 z-50 flex flex-col ${t.appBg} ${t.text}`}>
+      <div className={`p-4 border-b ${t.border} flex items-center gap-3`}>
+        <div className="w-10 h-10 rounded-full bg-cyan-500/20 flex items-center justify-center shrink-0"><User size={18} className="text-cyan-500" /></div>
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold text-sm truncate">{call.caller} · {call.title}</div>
+          <div className={`text-xs ${t.textMuted} flex items-center gap-1.5`}>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live · {formatCallDuration(now - call.startedAt)}
+          </div>
+        </div>
+        <PriorityBadge priority={priority} />
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 max-w-2xl w-full mx-auto">
+        {call.transcript.map((m) => (
+          <div key={m.id} className={`flex ${m.sender === "agent" ? "justify-end" : "justify-start"}`}>
+            <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm ${m.sender === "agent" ? "bg-cyan-500 text-slate-950 rounded-br-sm" : `${isDark ? "bg-slate-800" : "bg-slate-100"} rounded-bl-sm`}`}>
+              {m.text}
+            </div>
+          </div>
+        ))}
+        {callSending && <div className={`text-xs ${t.textFaint} italic`}>{call.caller} is speaking…</div>}
+        <div ref={callEndRef} />
+      </div>
+
+      <div className={`p-3 border-t ${t.border} max-w-2xl w-full mx-auto`}>
+        <div className="flex items-end gap-2 mb-3">
+          <textarea value={callInput} onChange={(e) => setCallInput(e.target.value)} rows={2}
+            placeholder={callMuted ? "You're muted — unmute to speak" : "Say something…"} disabled={callMuted || callSending}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendCallMessage(); } }}
+            className={`flex-1 resize-none rounded-lg border px-3 py-2 text-sm outline-none disabled:opacity-60 ${t.input}`} />
+          <button onClick={sendCallMessage} disabled={callMuted || callSending} className="p-2.5 rounded-lg bg-cyan-500 text-slate-950 disabled:opacity-50">
+            {callSending ? <RefreshCw size={16} className="animate-spin" /> : <Send size={16} />}
+          </button>
+        </div>
+        <div className="flex items-center justify-center gap-6">
+          <button onClick={() => setCallMuted((m) => !m)} className="flex flex-col items-center gap-1">
+            <span className={`w-11 h-11 rounded-full flex items-center justify-center border ${t.border} ${callMuted ? "bg-amber-500/20 text-amber-500" : t.hover}`}>
+              {callMuted ? <MicOff size={17} /> : <Mic size={17} />}
+            </span>
+            <span className={`text-[11px] ${t.textFaint}`}>{callMuted ? "Unmute" : "Mute"}</span>
+          </button>
+          <button onClick={endCall} className="flex flex-col items-center gap-1">
+            <span className="w-11 h-11 rounded-full bg-rose-500 flex items-center justify-center text-white active:scale-95 transition-transform"><PhoneOff size={19} /></span>
+            <span className={`text-[11px] ${t.textFaint}`}>Hang up</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------- */
+/*  SETTINGS                                                             */
+/* ---------------------------------------------------------------------- */
+
+function Toggle({ on, onClick, t }) {
+  return (
+    <button onClick={onClick} className={`w-10 h-6 rounded-full relative transition-colors ${on ? "bg-cyan-500" : (t.border.includes("slate-800") ? "bg-slate-700" : "bg-slate-300")}`}>
+      <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${on ? "left-[18px]" : "left-0.5"}`} />
+    </button>
+  );
+}
+
+function SettingRow({ label, desc, children, t }) {
+  return (
+    <div className={`flex items-center justify-between gap-4 py-3 border-b last:border-0 ${t.border}`}>
+      <div>
+        <div className="text-sm font-medium">{label}</div>
+        {desc && <div className={`text-xs ${t.textMuted} mt-0.5`}>{desc}</div>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function SettingsScreen({ t, isDark, settings, setSettings, resetSimulation, pushToast }) {
+  const set = (k, v) => setSettings((s) => ({ ...s, [k]: v }));
+  return (
+    <div className="p-4 md:p-8 max-w-2xl">
+      <h1 className="text-xl md:text-2xl font-semibold mb-1">Settings</h1>
+      <p className={`text-sm ${t.textMuted} mb-6`}>Tune the console to how you like to work. Saved automatically.</p>
+
+      <div className={`p-4 rounded-xl border ${t.border} ${t.panel} mb-4`}>
+        <h2 className="text-sm font-medium mb-1">Appearance</h2>
+        <SettingRow t={t} label="Theme" desc="Switch between dark and light mode">
+          <div className={`flex rounded-lg border p-0.5 ${t.border}`}>
+            <button onClick={() => set("theme", "dark")} className={`px-3 py-1.5 rounded-md text-xs flex items-center gap-1 ${isDark ? "bg-cyan-500 text-slate-950" : t.textMuted}`}><Moon size={12} /> Dark</button>
+            <button onClick={() => set("theme", "light")} className={`px-3 py-1.5 rounded-md text-xs flex items-center gap-1 ${!isDark ? "bg-cyan-500 text-slate-950" : t.textMuted}`}><Sun size={12} /> Light</button>
+          </div>
+        </SettingRow>
+        <SettingRow t={t} label="Density" desc="Spacing of the ticket queue list">
+          <select value={settings.density} onChange={(e) => set("density", e.target.value)} className={`text-xs rounded-lg border px-2 py-1.5 ${t.input}`}>
+            <option value="comfortable">Comfortable</option>
+            <option value="compact">Compact</option>
+          </select>
+        </SettingRow>
+        <SettingRow t={t} label="Text size" desc="Console-wide font size">
+          <select value={settings.fontSize} onChange={(e) => set("fontSize", e.target.value)} className={`text-xs rounded-lg border px-2 py-1.5 ${t.input}`}>
+            <option value="small">Small</option>
+            <option value="medium">Medium</option>
+            <option value="large">Large</option>
+          </select>
+        </SettingRow>
+      </div>
+
+      <div className={`p-4 rounded-xl border ${t.border} ${t.panel} mb-4`}>
+        <h2 className="text-sm font-medium mb-1">Agent profile</h2>
+        <SettingRow t={t} label="Display name" desc="Shown in the sidebar and closing notes">
+          <input value={settings.agentName} onChange={(e) => set("agentName", e.target.value)} className={`text-xs rounded-lg border px-2 py-1.5 w-32 ${t.input}`} />
+        </SettingRow>
+        <SettingRow t={t} label="Status" desc="Your current availability">
+          <select value={settings.agentStatus} onChange={(e) => set("agentStatus", e.target.value)} className={`text-xs rounded-lg border px-2 py-1.5 ${t.input}`}>
+            <option>Available</option><option>Away</option><option>Busy</option>
+          </select>
+        </SettingRow>
+      </div>
+
+      <div className={`p-4 rounded-xl border ${t.border} ${t.panel} mb-4`}>
+        <h2 className="text-sm font-medium mb-1">Queue behavior</h2>
+        <SettingRow t={t} label="Sound on new activity" desc="Play a cue when a ticket updates">
+          <Toggle t={t} on={settings.soundEnabled} onClick={() => set("soundEnabled", !settings.soundEnabled)} />
+        </SettingRow>
+        <SettingRow t={t} label="Auto-refresh queue" desc="Periodically re-check the queue in the background">
+          <Toggle t={t} on={settings.autoRefresh} onClick={() => set("autoRefresh", !settings.autoRefresh)} />
+        </SettingRow>
+        <SettingRow t={t} label="SLA warning threshold" desc="Turn the SLA timer amber past this % elapsed">
+          <div className="flex items-center gap-2">
+            <input type="range" min="40" max="95" value={settings.slaWarnPct} onChange={(e) => set("slaWarnPct", Number(e.target.value))} />
+            <span className="text-xs font-mono w-9">{settings.slaWarnPct}%</span>
+          </div>
+        </SettingRow>
+      </div>
+
+      <div className={`p-4 rounded-xl border ${t.border} ${t.panel}`}>
+        <h2 className="text-sm font-medium mb-1">Simulation data</h2>
+        <SettingRow t={t} label="Reset simulation" desc="Restore all tickets, notes and chats to their starting state">
+          <button onClick={resetSimulation} className="text-xs px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-500 border border-rose-500/30">Reset</button>
+        </SettingRow>
+      </div>
+    </div>
+  );
+}
