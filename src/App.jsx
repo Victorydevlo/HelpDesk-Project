@@ -732,6 +732,10 @@ Rules:
               className={`w-full flex items-center justify-center gap-2 text-xs py-1.5 rounded-lg border ${t.border} ${t.hover}`}>
               {isDark ? <Sun size={13} /> : <Moon size={13} />} {isDark ? "Light mode" : "Dark mode"}
             </button>
+            <button onClick={triggerTestCall} disabled={!!incomingCall || !!activeCall}
+              className={`w-full mt-2 flex items-center justify-center gap-2 text-xs py-1.5 rounded-lg border ${t.border} ${t.hover} disabled:opacity-40`}>
+              <PhoneIncoming size={13} /> Simulate a call
+            </button>
           </div>
         </aside>
 
@@ -743,6 +747,7 @@ Rules:
           </div>
           <div className="flex items-center gap-3">
             {metrics.breached > 0 && <span className="flex items-center gap-1 text-[11px] text-rose-500 font-mono"><AlertTriangle size={12} />{metrics.breached}</span>}
+            <button onClick={triggerTestCall} disabled={!!incomingCall || !!activeCall} className="disabled:opacity-30"><PhoneIncoming size={17} /></button>
             <button onClick={() => setSettings((s) => ({ ...s, theme: isDark ? "light" : "dark" }))}>{isDark ? <Sun size={17} /> : <Moon size={17} />}</button>
           </div>
         </header>
