@@ -854,3 +854,44 @@ function TicketDetail({ t, isDark, ticket, now, settings, detailTab, setDetailTa
   );
 }
 
+/* ---------------------------------------------------------------------- */
+/*  KNOWLEDGE BASE                                                        */
+/* ---------------------------------------------------------------------- */
+
+function KbScreen({ t, isDark, kbQuery, setKbQuery, filteredKb, openKb, setOpenKb }) {
+  const article = KB_ARTICLES.find((a) => a.id === openKb);
+  if (article) {
+    return (
+      <div className="p-4 md:p-8 max-w-3xl">
+        <button onClick={() => setOpenKb(null)} className={`flex items-center gap-1 text-sm mb-4 ${t.textMuted}`}><ChevronLeft size={15} /> Back to articles</button>
+        <span className={`text-xs font-mono ${t.textFaint}`}>{article.category}</span>
+        <h1 className="text-xl font-semibold mt-1 mb-3">{article.title}</h1>
+        <div className={`p-4 rounded-xl border ${t.border} ${t.panel} whitespace-pre-line text-sm leading-relaxed`}>{article.body}</div>
+      </div>
+    );
+  }
+  return (
+    <div className="p-4 md:p-8 max-w-4xl">
+      <h1 className="text-xl md:text-2xl font-semibold mb-1">Knowledge base</h1>
+      <p className={`text-sm ${t.textMuted} mb-4`}>Reference articles you can search while resolving tickets.</p>
+      <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border mb-4 ${t.input}`}>
+        <Search size={14} className={t.textFaint} />
+        <input value={kbQuery} onChange={(e) => setKbQuery(e.target.value)} placeholder="Search articles…" className="bg-transparent outline-none text-sm flex-1" />
+      </div>
+      <div className="grid sm:grid-cols-2 gap-3">
+        {filteredKb.map((a) => {
+          const Icon = CATEGORY_ICON[a.category] || FileText;
+          return (
+            <button key={a.id} onClick={() => setOpenKb(a.id)} className={`text-left p-4 rounded-xl border ${t.border} ${t.panel} ${t.hover}`}>
+              <div className="flex items-center gap-1.5 mb-1.5"><Icon size={13} className="text-cyan-500" /><span className={`text-xs font-mono ${t.textFaint}`}>{a.category}</span></div>
+              <div className="text-sm font-medium mb-1">{a.title}</div>
+              <div className={`text-xs ${t.textMuted}`}>{a.snippet}</div>
+            </button>
+          );
+        })}
+        {filteredKb.length === 0 && <div className={`text-sm ${t.textFaint}`}>No articles match "{kbQuery}".</div>}
+      </div>
+    </div>
+  );
+}
+
