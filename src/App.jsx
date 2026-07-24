@@ -558,6 +558,41 @@ export default function HelpdeskSimulator() {
     setNoteText("");
   }
 
+  /* ---------- L2 escalation ---------- */
+  const PRIORITY_ORDER = ["Low", "Medium", "High", "Critical"];
+  function escalateTicket(id) {
+    const tk = tickets.find((x) => x.id === id);
+    if (!tk) return;
+    const escalating = tk.tier !== "L2";
+    let patch = { tier: escalating ? "L2" : "L1" };
+    let noteText2 = escalating ? "Escalated to L2 support." : "De-escalated back to L1.";
+    if (escalating) {
+      const idx = PRIORITY_ORDER.indexOf(tk.priority);
+      const bumped = PRIORITY_ORDER[Math.min(idx + 1, PRIORITY_ORDER.length - 1)];
+      if (bumped !== tk.priority) {
+        const created = new Date(tk.createdAt).getTime();
+        patch.priority = bumped;
+        patch.dueAt = new Date(created + PRIORITY_META[bumped].hours * 3600000).toISOString();
+        noteText2 = `Escalated to L2 support, priority raised to ${bumped}.`;
+      }
+    }
+    setTickets((ts) => ts.map((x) => (x.id === id ? { ...x, ...patch, notes: [...x.notes, { id: Math.random().toString(36).slice(2), text: noteText2, time: new Date().toISOString() }] } : x)));
+    pushToast(`${id} ${escalating ? "escalated to L2" : "returned to L1"}`, "success");
+  }
+
+  /* ---------- L2 infrastructure ---------- */
+  function restartService(id) {
+    const svc = infra.find((s) => s.id === id);
+    if (!svc) return;
+    setInfra((list) => list.map((s) => (s.id === id ? { ...s, status: "Restarting" } : s)));
+    setInfraLog((log) => [{ id: Math.random().toString(36).slice(2), text: `Restart issued for ${svc.name}`, time: new Date().toISOString() }, ...log].slice(0, 20));
+    setTimeout(() => {
+      setInfra((list) => list.map((s) => (s.id === id ? { ...s, status: "Online", cpu: 15 + Math.floor(Math.random() * 20), mem: 25 + Math.floor(Math.random() * 25) } : s)));
+      setInfraLog((log) => [{ id: Math.random().toString(36).slice(2), text: `${svc.name} back online`, time: new Date().toISOString() }, ...log].slice(0, 20));
+      pushToast(`${svc.name} restarted successfully`, "success");
+    }, 2500);
+  }
+
   async function sendReply(id) {
     if (!replyText.trim() || aiTyping) return; // guard: never let two replies overlap and race each other
     const text = replyText;
@@ -651,6 +686,7 @@ Rules:
     switch (base.toLowerCase()) {
       case "help":
         out = ["Available: ping <host>, ipconfig, nslookup <host>, tracert <host>, systeminfo, netstat, whoami, clear"];
+        if (isL2) out.push("L2 commands: tasklist, sc query <service>, eventlog, netstat -b");
         break;
       case "ping": {
         const target = args[0] || "8.8.8.8";
@@ -680,10 +716,38 @@ Rules:
         out = [`Host Name: ${host}`, `OS: ${device?.os || "Windows 11 23H2"}`, `System Boot Time: ${new Date(now - 3600000 * 5).toLocaleString()}`, `Total Physical Memory: 16,384 MB`, `Available Physical Memory: ${(2 + Math.random() * 4).toFixed(1)} GB`];
         break;
       case "netstat":
-        out = ["Proto  Local Address        Foreign Address       State", "TCP    " + ip + ":51422      13.107.42.14:443      ESTABLISHED", "TCP    " + ip + ":51500      10.44.0.20:445        ESTABLISHED"];
+        if (args[0] === "-b" && isL2) {
+          out = ["Proto  Local Address        Foreign Address       State          Process",
+            "TCP    " + ip + ":51422      13.107.42.14:443      ESTABLISHED    [outlook.exe]",
+            "TCP    " + ip + ":51500      10.44.0.20:445        ESTABLISHED    [svchost.exe]",
+            "TCP    " + ip + ":51611      10.44.0.10:53         TIME_WAIT      [dnscache.exe]"];
+        } else {
+          out = ["Proto  Local Address        Foreign Address       State", "TCP    " + ip + ":51422      13.107.42.14:443      ESTABLISHED", "TCP    " + ip + ":51500      10.44.0.20:445        ESTABLISHED"];
+        }
         break;
       case "whoami":
         out = [`corp\\${(device?.host || "user").toLowerCase()}`];
+        break;
+      case "tasklist":
+        if (!isL2) { out = ["Access denied: 'tasklist' requires L2 access."]; break; }
+        out = ["Image Name              PID   Mem Usage", "svchost.exe             1188  24,412 K", "MsMpEng.exe              2244  118,204 K", "outlook.exe              3390  241,880 K", "spoolsv.exe              1440  9,532 K"];
+        break;
+      case "sc":
+        if (!isL2) { out = ["Access denied: 'sc' requires L2 access."]; break; }
+        if (args[0] === "query") {
+          const svcName = args[1] || "spooler";
+          out = [`SERVICE_NAME: ${svcName}`, "        TYPE               : 10  WIN32_OWN_PROCESS", "        STATE              : 4  RUNNING", "        WIN32_EXIT_CODE   : 0  (0x0)"];
+        } else {
+          out = ["Usage: sc query <service>"];
+        }
+        break;
+      case "eventlog":
+        if (!isL2) { out = ["Access denied: 'eventlog' requires L2 access."]; break; }
+        out = [
+          `${new Date(now - 600000).toLocaleTimeString()}  WARN   Service Control Manager   The Print Spooler service terminated unexpectedly.`,
+          `${new Date(now - 1800000).toLocaleTimeString()}  ERROR  Disk                       The device has a bad block.`,
+          `${new Date(now - 3600000).toLocaleTimeString()}  INFO   Security-Auditing          An account was successfully logged on.`,
+        ];
         break;
       case "clear":
         setTermHistory([{ type: "out", text: "RELAY diagnostics terminal — type 'help' for commands." }]);
@@ -731,6 +795,8 @@ Rules:
   const NAV = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "queue", label: "Queue", icon: Inbox },
+    ...(isL2 ? [{ id: "escalations", label: "Escalations", icon: ArrowUpCircle }] : []),
+    ...(isL2 ? [{ id: "infra", label: "Infrastructure", icon: Server }] : []),
     { id: "kb", label: "Knowledge Base", icon: BookOpen },
     { id: "diagnostics", label: "Diagnostics", icon: Terminal },
     { id: "settings", label: "Settings", icon: SettingsIcon },
@@ -752,10 +818,10 @@ Rules:
         {/* DESKTOP SIDEBAR */}
         <aside className={`hidden md:flex md:flex-col md:w-56 shrink-0 border-r ${t.border} ${t.panel}`}>
           <div className={`px-4 py-4 border-b ${t.border} flex items-center gap-2`}>
-            <div className="w-7 h-7 rounded bg-cyan-500 flex items-center justify-center text-slate-950 font-bold text-xs font-mono">R/</div>
+            <div className={`w-7 h-7 rounded ${t.brandBg} flex items-center justify-center text-slate-950 font-bold text-xs font-mono`}>R/</div>
             <div>
               <div className="font-semibold text-sm leading-none">RELAY</div>
-              <div className={`text-[11px] ${t.textFaint} font-mono`}>Helpdesk Simulator</div>
+              <div className={`text-[11px] ${t.textFaint} font-mono`}>{isL2 ? "L2 Escalation Console" : "Helpdesk Simulator"}</div>
             </div>
           </div>
           <nav className="flex-1 px-2 py-3 space-y-1">
@@ -769,12 +835,17 @@ Rules:
           </nav>
           <div className={`px-3 py-3 border-t ${t.border}`}>
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center"><User size={14} className="text-cyan-500" /></div>
-              <div className="min-w-0">
+              <div className={`w-8 h-8 rounded-full ${t.brandSoftBg} flex items-center justify-center`}><User size={14} className={t.brandText} /></div>
+              <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium truncate">{settings.agentName}</div>
                 <div className={`text-[11px] ${t.textFaint}`}>{settings.agentStatus}</div>
               </div>
+              <Badge className={t.brandSoftBg + " " + t.brandText}>{settings.tier}</Badge>
             </div>
+            <button onClick={() => setSettings((s) => ({ ...s, tier: s.tier === "L2" ? "L1" : "L2" }))}
+              className={`w-full flex items-center justify-center gap-2 text-xs py-1.5 rounded-lg border mb-2 ${isL2 ? "border-violet-500/40 text-violet-500 bg-violet-500/10" : `${t.border} ${t.hover}`}`}>
+              <Layers size={13} /> {isL2 ? "Switch to L1" : "Switch to L2"}
+            </button>
             <button onClick={() => setSettings((s) => ({ ...s, theme: isDark ? "light" : "dark" }))}
               className={`w-full flex items-center justify-center gap-2 text-xs py-1.5 rounded-lg border ${t.border} ${t.hover}`}>
               {isDark ? <Sun size={13} /> : <Moon size={13} />} {isDark ? "Light mode" : "Dark mode"}
@@ -789,11 +860,13 @@ Rules:
         {/* MOBILE TOP BAR */}
         <header className={`md:hidden flex items-center justify-between px-4 py-3 border-b ${t.border} ${t.panel} sticky top-0 z-30`}>
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded bg-cyan-500 flex items-center justify-center text-slate-950 font-bold text-[10px] font-mono">R/</div>
+            <div className={`w-6 h-6 rounded ${t.brandBg} flex items-center justify-center text-slate-950 font-bold text-[10px] font-mono`}>R/</div>
             <span className="font-semibold text-sm">RELAY</span>
+            <Badge className={t.brandSoftBg + " " + t.brandText}>{settings.tier}</Badge>
           </div>
           <div className="flex items-center gap-3">
             {metrics.breached > 0 && <span className="flex items-center gap-1 text-[11px] text-rose-500 font-mono"><AlertTriangle size={12} />{metrics.breached}</span>}
+            <button onClick={() => setSettings((s) => ({ ...s, tier: s.tier === "L2" ? "L1" : "L2" }))}><Layers size={17} className={isL2 ? "text-violet-500" : undefined} /></button>
             <button onClick={triggerTestCall} disabled={!!incomingCall || !!activeCall} className="disabled:opacity-30"><PhoneIncoming size={17} /></button>
             <button onClick={() => setSettings((s) => ({ ...s, theme: isDark ? "light" : "dark" }))}>{isDark ? <Sun size={17} /> : <Moon size={17} />}</button>
           </div>
@@ -818,7 +891,7 @@ Rules:
                     <TicketDetail t={t} isDark={isDark} ticket={selected} now={now} settings={settings}
                       detailTab={detailTab} setDetailTab={setDetailTab}
                       replyText={replyText} setReplyText={setReplyText} sendReply={sendReply} aiTyping={aiTyping}
-                      changeStatus={changeStatus} changePriority={changePriority}
+                      changeStatus={changeStatus} changePriority={changePriority} escalateTicket={escalateTicket}
                       noteText={noteText} setNoteText={setNoteText} addNote={addNote}
                       chatEndRef={chatEndRef} goDiagnostics={() => { setTermTicketId(selected.id); setScreen("diagnostics"); }} />
                   ) : (
@@ -840,7 +913,7 @@ Rules:
                     <TicketDetail t={t} isDark={isDark} ticket={selected} now={now} settings={settings}
                       detailTab={detailTab} setDetailTab={setDetailTab}
                       replyText={replyText} setReplyText={setReplyText} sendReply={sendReply} aiTyping={aiTyping}
-                      changeStatus={changeStatus} changePriority={changePriority}
+                      changeStatus={changeStatus} changePriority={changePriority} escalateTicket={escalateTicket}
                       noteText={noteText} setNoteText={setNoteText} addNote={addNote}
                       chatEndRef={chatEndRef} goDiagnostics={() => { setTermTicketId(selected.id); setScreen("diagnostics"); }} />
                   </div>
@@ -849,13 +922,27 @@ Rules:
             </>
           )}
 
+          {screen === "escalations" && isL2 && (
+            <EscalationsScreen t={t} isDark={isDark} tickets={tickets} now={now} settings={settings}
+              selectedId={selectedId} setSelectedId={setSelectedId} density={density}
+              detailTab={detailTab} setDetailTab={setDetailTab}
+              replyText={replyText} setReplyText={setReplyText} sendReply={sendReply} aiTyping={aiTyping}
+              changeStatus={changeStatus} changePriority={changePriority} escalateTicket={escalateTicket}
+              noteText={noteText} setNoteText={setNoteText} addNote={addNote}
+              chatEndRef={chatEndRef} goDiagnostics={(id) => { setTermTicketId(id); setScreen("diagnostics"); }} />
+          )}
+
+          {screen === "infra" && isL2 && (
+            <InfrastructureScreen t={t} isDark={isDark} infra={infra} infraLog={infraLog} restartService={restartService} now={now} />
+          )}
+
           {screen === "kb" && (
             <KbScreen t={t} isDark={isDark} kbQuery={kbQuery} setKbQuery={setKbQuery} filteredKb={filteredKb} openKb={openKb} setOpenKb={setOpenKb} />
           )}
 
           {screen === "diagnostics" && (
             <DiagnosticsScreen t={t} isDark={isDark} tickets={tickets} termTicketId={termTicketId} setTermTicketId={setTermTicketId}
-              termHistory={termHistory} termInput={termInput} setTermInput={setTermInput} runCommand={runCommand} termEndRef={termEndRef} />
+              termHistory={termHistory} termInput={termInput} setTermInput={setTermInput} runCommand={runCommand} termEndRef={termEndRef} isL2={isL2} />
           )}
 
           {screen === "settings" && (
@@ -866,11 +953,11 @@ Rules:
       </div>
 
       {/* MOBILE BOTTOM NAV */}
-      <nav className={`md:hidden fixed bottom-0 left-0 right-0 z-30 border-t ${t.border} ${t.panel} flex justify-around py-2`}>
+      <nav className={`md:hidden fixed bottom-0 left-0 right-0 z-30 border-t ${t.border} ${t.panel} flex justify-around py-2 overflow-x-auto no-scrollbar`}>
         {NAV.map((n) => (
-          <button key={n.id} onClick={() => { setScreen(n.id); setSelectedId(null); }} className={`flex flex-col items-center gap-0.5 px-2 py-1 text-[10px] ${screen === n.id ? "text-cyan-500" : t.textFaint}`}>
-            <n.icon size={19} />
-            {n.label === "Knowledge Base" ? "KB" : n.label}
+          <button key={n.id} onClick={() => { setScreen(n.id); setSelectedId(null); }} className={`flex flex-col items-center gap-0.5 px-1.5 py-1 text-[9px] shrink-0 ${screen === n.id ? t.brandText : t.textFaint}`}>
+            <n.icon size={18} />
+            {n.label === "Knowledge Base" ? "KB" : n.label === "Infrastructure" ? "Infra" : n.label === "Escalations" ? "Escal." : n.label}
           </button>
         ))}
       </nav>
@@ -973,6 +1060,135 @@ function DashboardScreen({ t, isDark, metrics, tickets, now, settings, goQueue }
 }
 
 /* ---------------------------------------------------------------------- */
+/*  L2 — ESCALATIONS                                                      */
+/* ---------------------------------------------------------------------- */
+
+function EscalationsScreen({ t, isDark, tickets, now, settings, selectedId, setSelectedId, density,
+  detailTab, setDetailTab, replyText, setReplyText, sendReply, aiTyping, changeStatus, changePriority,
+  escalateTicket, noteText, setNoteText, addNote, chatEndRef, goDiagnostics }) {
+  const escalated = tickets.filter((tk) => tk.tier === "L2")
+    .sort((a, b) => PRIORITY_META[a.priority].order - PRIORITY_META[b.priority].order);
+  const selected = escalated.find((tk) => tk.id === selectedId) || null;
+
+  const List = (
+    <div className={selected ? "hidden md:block" : ""}>
+      <div className={`p-4 border-b ${t.border}`}>
+        <h1 className="text-lg font-semibold flex items-center gap-2"><ArrowUpCircle size={18} className="text-violet-500" /> Escalations</h1>
+        <p className={`text-xs ${t.textMuted} mt-1`}>Tickets handed up from L1, sorted by priority.</p>
+      </div>
+      {escalated.length === 0 && <div className={`p-6 text-sm text-center ${t.textFaint}`}>Nothing escalated right now.</div>}
+      {escalated.map((tk) => {
+        const Icon = CATEGORY_ICON[tk.category] || FileText;
+        return (
+          <button key={tk.id} onClick={() => setSelectedId(tk.id)}
+            className={`w-full text-left px-4 ${density} border-b ${t.border} ${selectedId === tk.id ? t.active : t.hover} transition-colors`}>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <span className={`text-xs font-mono ${t.textFaint}`}>{tk.id}</span>
+              <PriorityBadge priority={tk.priority} />
+            </div>
+            <div className="text-sm font-medium mb-1 truncate">{tk.subject}</div>
+            <div className={`flex items-center gap-2 text-xs ${t.textMuted}`}>
+              <Icon size={12} /> <span className="truncate">{tk.requester} · {tk.dept}</span>
+            </div>
+            <div className="flex items-center justify-between mt-1.5">
+              <StatusBadge status={tk.status} />
+              <SlaTimer ticket={tk} now={now} t={t} warnPct={settings.slaWarnPct} />
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const Detail = selected ? (
+    <div>
+      <button onClick={() => setSelectedId(null)} className={`md:hidden flex items-center gap-1 px-4 py-3 text-sm ${t.textMuted}`}>
+        <ArrowLeft size={15} /> Back to escalations
+      </button>
+      <TicketDetail t={t} isDark={isDark} ticket={selected} now={now} settings={settings}
+        detailTab={detailTab} setDetailTab={setDetailTab}
+        replyText={replyText} setReplyText={setReplyText} sendReply={sendReply} aiTyping={aiTyping}
+        changeStatus={changeStatus} changePriority={changePriority} escalateTicket={escalateTicket}
+        noteText={noteText} setNoteText={setNoteText} addNote={addNote}
+        chatEndRef={chatEndRef} goDiagnostics={() => goDiagnostics(selected.id)} />
+    </div>
+  ) : (
+    <div className={`hidden md:flex h-full items-center justify-center ${t.textFaint} text-sm`}>Select an escalated ticket</div>
+  );
+
+  return (
+    <div className="md:grid md:grid-cols-[380px_1fr] md:h-screen">
+      {List}
+      <div className={`md:border-l ${t.border} md:overflow-y-auto`}>{Detail}</div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------- */
+/*  L2 — INFRASTRUCTURE                                                   */
+/* ---------------------------------------------------------------------- */
+
+function InfrastructureScreen({ t, isDark, infra, infraLog, restartService, now }) {
+  const statusStyle = (s) => {
+    if (s === "Online") return "text-emerald-500 bg-emerald-500/10";
+    if (s === "Degraded") return "text-amber-500 bg-amber-500/10";
+    if (s === "Restarting") return "text-violet-500 bg-violet-500/10";
+    return "text-rose-500 bg-rose-500/10";
+  };
+  return (
+    <div className="p-4 md:p-8 max-w-5xl">
+      <h1 className="text-xl md:text-2xl font-semibold mb-1 flex items-center gap-2"><Server size={20} className="text-violet-500" /> Infrastructure</h1>
+      <p className={`text-sm ${t.textMuted} mb-6`}>Server and service health for systems L2 can act on directly.</p>
+
+      <div className="grid sm:grid-cols-2 gap-3 mb-6">
+        {infra.map((s) => {
+          const Icon = s.icon === "database" ? Database : Server;
+          return (
+            <div key={s.id} className={`p-4 rounded-xl border ${t.border} ${t.panel}`}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Icon size={16} className="text-violet-500" />
+                  <span className="font-mono text-sm font-medium">{s.name}</span>
+                </div>
+                <Badge className={statusStyle(s.status)}>{s.status === "Restarting" && <RefreshCw size={10} className="animate-spin" />}{s.status}</Badge>
+              </div>
+              <div className={`text-xs ${t.textMuted} mb-3`}>{s.type} · uptime {s.uptime}</div>
+              <div className="space-y-1.5 mb-3">
+                <div>
+                  <div className="flex justify-between text-[11px] mb-0.5"><span className={t.textFaint}>CPU</span><span className="font-mono">{s.cpu}%</span></div>
+                  <div className={`h-1.5 rounded-full ${isDark ? "bg-slate-800" : "bg-slate-200"}`}><div className="h-1.5 rounded-full bg-violet-500" style={{ width: `${s.cpu}%` }} /></div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-[11px] mb-0.5"><span className={t.textFaint}>Memory</span><span className="font-mono">{s.mem}%</span></div>
+                  <div className={`h-1.5 rounded-full ${isDark ? "bg-slate-800" : "bg-slate-200"}`}><div className="h-1.5 rounded-full bg-violet-400" style={{ width: `${s.mem}%` }} /></div>
+                </div>
+              </div>
+              <button onClick={() => restartService(s.id)} disabled={s.status === "Restarting"}
+                className={`text-xs px-3 py-1.5 rounded-lg border ${t.border} ${t.hover} disabled:opacity-40 flex items-center gap-1`}>
+                <RefreshCw size={12} /> Restart service
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className={`p-4 rounded-xl border ${t.border} ${t.panel}`}>
+        <h2 className="text-sm font-medium mb-3 flex items-center gap-1.5"><Activity size={14} className="text-violet-500" /> Action log</h2>
+        {infraLog.length === 0 && <div className={`text-sm ${t.textFaint}`}>No actions taken yet.</div>}
+        <div className="space-y-1.5">
+          {infraLog.map((l) => (
+            <div key={l.id} className="flex items-center justify-between text-xs">
+              <span className={t.textMuted}>{l.text}</span>
+              <span className={`font-mono ${t.textFaint}`}>{new Date(l.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------- */
 /*  QUEUE LIST                                                            */
 /* ---------------------------------------------------------------------- */
 
@@ -988,7 +1204,7 @@ function QueueList({ t, tickets, selectedId, setSelectedId, now, settings, queue
         <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
           {["All", ...STATUS_LIST].map((f) => (
             <button key={f} onClick={() => setQueueFilter(f)}
-              className={`px-2.5 py-1 rounded-full text-xs shrink-0 border ${queueFilter === f ? "bg-cyan-500 border-cyan-500 text-slate-950 font-medium" : `${t.border} ${t.textMuted}`}`}>
+              className={`px-2.5 py-1 rounded-full text-xs shrink-0 border ${queueFilter === f ? `${t.brandBg} ${t.brandBorder} text-slate-950 font-medium` : `${t.border} ${t.textMuted}`}`}>
               {f}
             </button>
           ))}
@@ -1026,7 +1242,7 @@ function QueueList({ t, tickets, selectedId, setSelectedId, now, settings, queue
 /* ---------------------------------------------------------------------- */
 
 function TicketDetail({ t, isDark, ticket, now, settings, detailTab, setDetailTab, replyText, setReplyText, sendReply, aiTyping,
-  changeStatus, changePriority, noteText, setNoteText, addNote, chatEndRef, goDiagnostics }) {
+  changeStatus, changePriority, escalateTicket, noteText, setNoteText, addNote, chatEndRef, goDiagnostics }) {
   const tabs = [
     { id: "conversation", label: "Conversation" },
     { id: "notes", label: `Notes (${ticket.notes.length})` },
@@ -1043,6 +1259,9 @@ function TicketDetail({ t, isDark, ticket, now, settings, detailTab, setDetailTa
         <div className="flex flex-wrap items-center gap-2">
           <PriorityBadge priority={ticket.priority} />
           <StatusBadge status={ticket.status} />
+          {ticket.tier === "L2" && (
+            <Badge className="bg-violet-500/10 text-violet-500"><Layers size={11} /> L2</Badge>
+          )}
           <span className={`text-xs ${t.textMuted}`}>{ticket.requester} · {ticket.dept}</span>
         </div>
         <div className="flex flex-wrap gap-2 mt-3">
@@ -1057,6 +1276,12 @@ function TicketDetail({ t, isDark, ticket, now, settings, detailTab, setDetailTa
           <button onClick={goDiagnostics} className={`text-xs rounded-lg border px-2 py-1.5 flex items-center gap-1 ${t.border} ${t.hover}`}>
             <Wrench size={12} /> Diagnostics
           </button>
+          {escalateTicket && (
+            <button onClick={() => escalateTicket(ticket.id)}
+              className={`text-xs rounded-lg border px-2 py-1.5 flex items-center gap-1 ${ticket.tier === "L2" ? "border-violet-500/40 text-violet-500 bg-violet-500/10" : `${t.border} ${t.hover}`}`}>
+              <ArrowUpCircle size={12} /> {ticket.tier === "L2" ? "Return to L1" : "Escalate to L2"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -1074,7 +1299,7 @@ function TicketDetail({ t, isDark, ticket, now, settings, detailTab, setDetailTa
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {ticket.thread.map((m) => (
               <div key={m.id} className={`flex ${m.sender === "agent" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm ${m.sender === "agent" ? "bg-cyan-500 text-slate-950 rounded-br-sm" : `${isDark ? "bg-slate-800" : "bg-slate-100"} rounded-bl-sm`}`}>
+                <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm ${m.sender === "agent" ? `${t.brandBg} text-slate-950 rounded-br-sm` : `${isDark ? "bg-slate-800" : "bg-slate-100"} rounded-bl-sm`}`}>
                   {m.text}
                   <div className={`text-[10px] mt-1 ${m.sender === "agent" ? "text-slate-950/60" : t.textFaint}`}>{new Date(m.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
                 </div>
@@ -1095,7 +1320,7 @@ function TicketDetail({ t, isDark, ticket, now, settings, detailTab, setDetailTa
                 placeholder={aiTyping ? "Waiting for a reply…" : "Type a reply to the requester…"} disabled={aiTyping}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendReply(ticket.id); } }}
                 className={`flex-1 resize-none rounded-lg border px-3 py-2 text-sm outline-none disabled:opacity-60 ${t.input}`} />
-              <button onClick={() => sendReply(ticket.id)} disabled={aiTyping} className="p-2.5 rounded-lg bg-cyan-500 text-slate-950 disabled:opacity-50">
+              <button onClick={() => sendReply(ticket.id)} disabled={aiTyping} className={`p-2.5 rounded-lg ${t.brandBg} text-slate-950 disabled:opacity-50`}>
                 {aiTyping ? <RefreshCw size={16} className="animate-spin" /> : <Send size={16} />}
               </button>
             </div>
@@ -1192,12 +1417,16 @@ function KbScreen({ t, isDark, kbQuery, setKbQuery, filteredKb, openKb, setOpenK
 /*  DIAGNOSTICS TERMINAL                                                  */
 /* ---------------------------------------------------------------------- */
 
-function DiagnosticsScreen({ t, isDark, tickets, termTicketId, setTermTicketId, termHistory, termInput, setTermInput, runCommand, termEndRef }) {
+function DiagnosticsScreen({ t, isDark, tickets, termTicketId, setTermTicketId, termHistory, termInput, setTermInput, runCommand, termEndRef, isL2 }) {
   const openTickets = tickets.filter((tk) => tk.status !== "Closed");
   return (
     <div className="p-4 md:p-8 max-w-4xl">
       <h1 className="text-xl md:text-2xl font-semibold mb-1">Diagnostics terminal</h1>
-      <p className={`text-sm ${t.textMuted} mb-4`}>Run read-only diagnostic commands against a ticket's device context.</p>
+      <p className={`text-sm ${t.textMuted} mb-4`}>Run read-only diagnostic commands against a ticket's device context.
+        {isL2
+          ? <span className="text-violet-500"> L2 access active — tasklist, sc query, eventlog, and netstat -b unlocked.</span>
+          : " Switch to L2 in Settings to unlock deeper commands."}
+      </p>
       <div className="flex items-center gap-2 mb-3">
         <span className={`text-xs ${t.textMuted}`}>Context:</span>
         <select value={termTicketId || ""} onChange={(e) => setTermTicketId(e.target.value || null)}
@@ -1294,7 +1523,7 @@ function ActiveCallScreen({ t, isDark, call, now, callInput, setCallInput, sendC
       <div className="flex-1 overflow-y-auto p-4 space-y-3 max-w-2xl w-full mx-auto">
         {call.transcript.map((m) => (
           <div key={m.id} className={`flex ${m.sender === "agent" ? "justify-end" : "justify-start"}`}>
-            <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm ${m.sender === "agent" ? "bg-cyan-500 text-slate-950 rounded-br-sm" : `${isDark ? "bg-slate-800" : "bg-slate-100"} rounded-bl-sm`}`}>
+            <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm ${m.sender === "agent" ? `${t.brandBg} text-slate-950 rounded-br-sm` : `${isDark ? "bg-slate-800" : "bg-slate-100"} rounded-bl-sm`}`}>
               {m.text}
             </div>
           </div>
@@ -1309,7 +1538,7 @@ function ActiveCallScreen({ t, isDark, call, now, callInput, setCallInput, sendC
             placeholder={callMuted ? "You're muted — unmute to speak" : "Say something…"} disabled={callMuted || callSending}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendCallMessage(); } }}
             className={`flex-1 resize-none rounded-lg border px-3 py-2 text-sm outline-none disabled:opacity-60 ${t.input}`} />
-          <button onClick={sendCallMessage} disabled={callMuted || callSending} className="p-2.5 rounded-lg bg-cyan-500 text-slate-950 disabled:opacity-50">
+          <button onClick={sendCallMessage} disabled={callMuted || callSending} className={`p-2.5 rounded-lg ${t.brandBg} text-slate-950 disabled:opacity-50`}>
             {callSending ? <RefreshCw size={16} className="animate-spin" /> : <Send size={16} />}
           </button>
         </div>
@@ -1336,7 +1565,7 @@ function ActiveCallScreen({ t, isDark, call, now, callInput, setCallInput, sendC
 
 function Toggle({ on, onClick, t }) {
   return (
-    <button onClick={onClick} className={`w-10 h-6 rounded-full relative transition-colors ${on ? "bg-cyan-500" : (t.border.includes("slate-800") ? "bg-slate-700" : "bg-slate-300")}`}>
+    <button onClick={onClick} className={`w-10 h-6 rounded-full relative transition-colors ${on ? t.brandBg : (t.border.includes("slate-800") ? "bg-slate-700" : "bg-slate-300")}`}>
       <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${on ? "left-[18px]" : "left-0.5"}`} />
     </button>
   );
@@ -1356,17 +1585,35 @@ function SettingRow({ label, desc, children, t }) {
 
 function SettingsScreen({ t, isDark, settings, setSettings, resetSimulation, pushToast, triggerTestCall, callInProgress }) {
   const set = (k, v) => setSettings((s) => ({ ...s, [k]: v }));
+  const isL2 = settings.tier === "L2";
   return (
     <div className="p-4 md:p-8 max-w-2xl">
       <h1 className="text-xl md:text-2xl font-semibold mb-1">Settings</h1>
       <p className={`text-sm ${t.textMuted} mb-6`}>Tune the console to how you like to work. Saved automatically.</p>
 
       <div className={`p-4 rounded-xl border ${t.border} ${t.panel} mb-4`}>
+        <h2 className="text-sm font-medium mb-1 flex items-center gap-1.5"><Layers size={14} className={isL2 ? "text-violet-500" : t.textMuted} /> Support tier</h2>
+        <SettingRow t={t} label="Tier" desc={isL2 ? "L2: escalation queue, infrastructure access, and elevated diagnostics unlocked." : "L1: standard front-line queue and diagnostics."}>
+          <div className={`flex rounded-lg border p-0.5 ${t.border}`}>
+            <button onClick={() => set("tier", "L1")} className={`px-3 py-1.5 rounded-md text-xs font-medium ${!isL2 ? "bg-cyan-500 text-slate-950" : t.textMuted}`}>L1</button>
+            <button onClick={() => set("tier", "L2")} className={`px-3 py-1.5 rounded-md text-xs font-medium ${isL2 ? "bg-violet-500 text-slate-950" : t.textMuted}`}>L2</button>
+          </div>
+        </SettingRow>
+        {isL2 && (
+          <div className={`mt-2 p-3 rounded-lg text-xs ${t.textMuted} bg-violet-500/5 border border-violet-500/20`}>
+            L2 adds: an <b>Escalations</b> queue for tickets handed up from L1, an <b>Infrastructure</b> screen for
+            restarting simulated servers/services, deeper diagnostics commands (tasklist, sc query, eventlog, netstat -b),
+            and an Escalate/Return-to-L1 action on every ticket. The whole console also reskins from cyan to violet.
+          </div>
+        )}
+      </div>
+
+      <div className={`p-4 rounded-xl border ${t.border} ${t.panel} mb-4`}>
         <h2 className="text-sm font-medium mb-1">Appearance</h2>
         <SettingRow t={t} label="Theme" desc="Switch between dark and light mode">
           <div className={`flex rounded-lg border p-0.5 ${t.border}`}>
-            <button onClick={() => set("theme", "dark")} className={`px-3 py-1.5 rounded-md text-xs flex items-center gap-1 ${isDark ? "bg-cyan-500 text-slate-950" : t.textMuted}`}><Moon size={12} /> Dark</button>
-            <button onClick={() => set("theme", "light")} className={`px-3 py-1.5 rounded-md text-xs flex items-center gap-1 ${!isDark ? "bg-cyan-500 text-slate-950" : t.textMuted}`}><Sun size={12} /> Light</button>
+            <button onClick={() => set("theme", "dark")} className={`px-3 py-1.5 rounded-md text-xs flex items-center gap-1 ${isDark ? t.brandBg + " text-slate-950" : t.textMuted}`}><Moon size={12} /> Dark</button>
+            <button onClick={() => set("theme", "light")} className={`px-3 py-1.5 rounded-md text-xs flex items-center gap-1 ${!isDark ? t.brandBg + " text-slate-950" : t.textMuted}`}><Sun size={12} /> Light</button>
           </div>
         </SettingRow>
         <SettingRow t={t} label="Density" desc="Spacing of the ticket queue list">
