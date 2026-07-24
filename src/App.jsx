@@ -110,6 +110,7 @@ function seedTickets() {
       notes: [],
       resolved: t.status === "Resolved" || t.status === "Closed",
       attempts: 0,
+      tier: [1035, 1022].includes(t.num) ? "L2" : "L1",
     };
   });
 }
