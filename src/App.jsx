@@ -826,6 +826,13 @@ Rules:
           </button>
         ))}
       </nav>
+
+      {incomingCall && <IncomingCallModal t={t} isDark={isDark} call={incomingCall} onAccept={acceptCall} onDecline={declineCall} />}
+      {activeCall && (
+        <ActiveCallScreen t={t} isDark={isDark} call={activeCall} now={now} callInput={callInput} setCallInput={setCallInput}
+          sendCallMessage={sendCallMessage} callSending={callSending} callMuted={callMuted} setCallMuted={setCallMuted}
+          endCall={endCall} callEndRef={callEndRef} />
+      )}
     </div>
   );
 }
