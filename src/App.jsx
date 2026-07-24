@@ -46,3 +46,66 @@ const KB_ARTICLES = [
   { id: "kb-8", category: "Software Request", title: "Requesting a new software license", snippet: "Procurement workflow for paid software requests.", body: "1. Confirm the request has manager approval attached.\n2. Check for an existing volume license before buying new seats.\n3. Submit to procurement with cost center code.\n4. Deploy via the software center once the license key is issued." },
 ];
 
+function minutesAgo(m) { return new Date(Date.now() - m * 60000); }
+
+function seedTickets() {
+  const raw = [
+    { num: 1042, subject: "Cannot connect to VPN after Windows update", requester: "Jordan Reyes", dept: "Sales", priority: "Critical", status: "Open", category: "Network", created: 35, host: "SLS-JR-0447", os: "Windows 11 23H2", ip: "10.44.12.87", desc: "My VPN client won't connect since the update installed last night. I get 'Error 809' every time I try to log in and I have a client call in an hour.",
+      thread: [{ sender: "customer", text: "My VPN client won't connect since last night's update. Getting Error 809 every time. I have a client call in an hour — please help!" }] },
+    { num: 1041, subject: "Password reset — locked out of AD account", requester: "Priya Nandakumar", dept: "Finance", priority: "High", status: "New", category: "Account Access", created: 12, host: "FIN-PN-1120", os: "Windows 11", ip: "10.44.8.22", desc: "Entered my password wrong too many times and now I'm completely locked out, can't access anything.",
+      thread: [{ sender: "customer", text: "I'm locked out of my account, I think I mistyped my password a few times. Can someone reset it? I need to close month-end today." }] },
+    { num: 1039, subject: "Printer HP-3F offline, error 79", requester: "Marcus Webb", dept: "Operations", priority: "Medium", status: "Open", category: "Hardware", created: 95, host: "OPS-MW-0212", os: "Windows 10", ip: "10.44.20.5", desc: "The 3rd floor printer is showing offline and error 79 on its display panel.",
+      thread: [{ sender: "customer", text: "The printer on 3rd floor is throwing 'Error 79' on its screen and shows offline for everyone on the floor." }] },
+    { num: 1037, subject: "Outlook not syncing, stuck 'Trying to connect'", requester: "Elena Cho", dept: "Marketing", priority: "Medium", status: "Pending", category: "Software", created: 260, host: "MKT-EC-0391", os: "Windows 11", ip: "10.44.15.61", desc: "Outlook has been stuck trying to connect since this morning, no new mail coming in.",
+      thread: [
+        { sender: "customer", text: "Outlook's been stuck on 'Trying to connect...' since 9am, I'm not getting any new mail." },
+        { sender: "agent", text: "Thanks Elena — can you try opening Outlook in Safe Mode (hold Ctrl while launching) and let me know if it connects?" },
+        { sender: "customer", text: "Tried that, still stuck. Waiting to hear back." },
+      ] },
+    { num: 1035, subject: "Suspicious email reported — possible phishing", requester: "Dan Ferris", dept: "Legal", priority: "Critical", status: "New", category: "Security", created: 6, host: "LGL-DF-0087", os: "Windows 11", ip: "10.44.3.14", desc: "Received an email claiming to be from IT asking to verify credentials via a link, looks suspicious.",
+      thread: [{ sender: "customer", text: "Got an email 'from IT' asking me to verify my password through a link. Feels off, reporting it before I click anything." }] },
+    { num: 1033, subject: "Laptop won't boot past BIOS screen", requester: "Aisha Bello", dept: "Engineering", priority: "High", status: "Open", category: "Hardware", created: 140, host: "ENG-AB-0509", os: "Windows 11", ip: "10.44.30.9", desc: "Laptop hangs on the manufacturer logo screen and never reaches the login page.",
+      thread: [{ sender: "customer", text: "My laptop just hangs on the boot logo, never gets to the login screen. Restarted it three times already." }] },
+    { num: 1030, subject: "MFA app not generating codes after phone swap", requester: "Tom Okafor", dept: "HR", priority: "High", status: "New", category: "Account Access", created: 20, host: "HR-TO-0144", os: "macOS", ip: "10.44.9.33", desc: "Got a new phone, MFA authenticator wasn't migrated, now can't log into anything.",
+      thread: [{ sender: "customer", text: "I switched phones over the weekend and forgot to migrate my authenticator app. Now I can't get past MFA on anything." }] },
+    { num: 1028, subject: "Request: Adobe Acrobat Pro license", requester: "Grace Lin", dept: "Design", priority: "Low", status: "Pending", category: "Software Request", created: 900, host: "DSN-GL-0261", os: "macOS", ip: "10.44.18.4", desc: "Need Acrobat Pro for editing client contract PDFs, manager approval attached.",
+      thread: [{ sender: "customer", text: "Requesting an Acrobat Pro license for contract editing, my manager already approved it over email." }] },
+    { num: 1025, subject: "Shared drive access denied — \\\\FS01\\Finance", requester: "Sam Whitfield", dept: "Finance", priority: "Medium", status: "Open", category: "Permissions", created: 180, host: "FIN-SW-0733", os: "Windows 10", ip: "10.44.8.40", desc: "Getting 'Access Denied' trying to open the Finance shared drive that used to work fine.",
+      thread: [{ sender: "customer", text: "I'm getting 'Access Denied' on the Finance shared drive. It worked fine last week, nothing's changed on my end." }] },
+    { num: 1022, subject: "Laptop running extremely slow, possible malware", requester: "Noah Kim", dept: "Support", priority: "Critical", status: "Open", category: "Security", created: 50, host: "SUP-NK-0199", os: "Windows 11", ip: "10.44.5.71", desc: "Fan constantly running, laptop very slow, a browser toolbar appeared that I didn't install.",
+      thread: [{ sender: "customer", text: "My laptop's been crawling since yesterday, fan running full blast, and there's a search toolbar in my browser I never installed." }] },
+    { num: 1019, subject: "External monitor no signal via dock", requester: "Lily Chen", dept: "Engineering", priority: "Low", status: "Resolved", category: "Hardware", created: 1400, host: "ENG-LC-0876", os: "Windows 11", ip: "10.44.30.22", desc: "External monitor showed 'No Signal' when docked, resolved by firmware update on the dock.",
+      thread: [
+        { sender: "customer", text: "External monitor says 'No Signal' whenever I dock my laptop." },
+        { sender: "agent", text: "Can you check the dock's firmware version in the vendor utility? There's a known display bug pre-2.14." },
+        { sender: "customer", text: "Updated it, working now, thank you!" },
+        { sender: "agent", text: "Great, glad that fixed it. Marking this resolved — reply if it comes back." },
+      ] },
+    { num: 1015, subject: "New hire onboarding — account + equipment", requester: "Ravi Desai", dept: "HR", priority: "Medium", status: "Closed", category: "Onboarding", created: 4200, host: "HR-RD-0900", os: "Windows 11", ip: "10.44.9.5", desc: "Standard new-hire setup for a start date of this week, completed and closed.",
+      thread: [
+        { sender: "customer", text: "New hire starting Monday, needs full account + hardware setup." },
+        { sender: "agent", text: "All set — account provisioned, laptop imaged and shipped, added to HR security group." },
+      ] },
+  ];
+  return raw.map((t) => {
+    const createdAt = minutesAgo(t.created);
+    const dueAt = new Date(createdAt.getTime() + PRIORITY_META[t.priority].hours * 3600000);
+    return {
+      id: `TCK-${t.num}`,
+      subject: t.subject,
+      requester: t.requester,
+      dept: t.dept,
+      priority: t.priority,
+      status: t.status,
+      category: t.category,
+      createdAt: createdAt.toISOString(),
+      dueAt: dueAt.toISOString(),
+      device: { host: t.host, os: t.os, ip: t.ip },
+      description: t.desc,
+      assigned: t.status === "New" ? "Unassigned" : "You",
+      thread: t.thread.map((m, i) => ({ id: `${t.num}-${i}`, sender: m.sender, text: m.text, time: new Date(createdAt.getTime() + i * 4 * 60000).toISOString() })),
+      notes: [],
+    };
+  });
+}
+
