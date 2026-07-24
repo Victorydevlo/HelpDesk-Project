@@ -109,3 +109,12 @@ function seedTickets() {
   });
 }
 
+const FALLBACK_REPLIES = [
+  "Okay, trying that now.",
+  "Still not working on my end, sorry.",
+  "Oh — that actually seems to have helped, let me double check.",
+  "Got it, one second.",
+  "Yes, that's exactly what's happening.",
+  "Thanks, I'll try that and let you know.",
+];
+
