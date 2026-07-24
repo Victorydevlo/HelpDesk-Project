@@ -5,7 +5,8 @@ import {
   Clock, User, ShieldAlert, ArrowLeft, RefreshCw, Volume2, VolumeX,
   Wifi, HardDrive, Mail, Printer, KeyRound, Bug, Laptop, Monitor as MonitorIcon,
   FileText, Zap, ChevronRight, X, StickyNote, Wrench, TrendingUp, Users, Timer,
-  Phone, PhoneCall, PhoneOff, Mic, MicOff, PhoneIncoming
+  Phone, PhoneCall, PhoneOff, Mic, MicOff, PhoneIncoming,
+  Server, Cpu, Activity, ArrowUpCircle, Layers, Database, GitBranch
 } from "lucide-react";
 
 /* ---------------------------------------------------------------------- */
