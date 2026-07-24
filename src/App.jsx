@@ -105,18 +105,29 @@ function seedTickets() {
       assigned: t.status === "New" ? "Unassigned" : "You",
       thread: t.thread.map((m, i) => ({ id: `${t.num}-${i}`, sender: m.sender, text: m.text, time: new Date(createdAt.getTime() + i * 4 * 60000).toISOString() })),
       notes: [],
+      resolved: t.status === "Resolved" || t.status === "Closed",
+      attempts: 0,
     };
   });
 }
 
-const FALLBACK_REPLIES = [
-  "Okay, trying that now.",
-  "Still not working on my end, sorry.",
-  "Oh — that actually seems to have helped, let me double check.",
-  "Got it, one second.",
-  "Yes, that's exactly what's happening.",
-  "Thanks, I'll try that and let you know.",
-];
+const FALLBACK_TRYING = ["Okay, trying that now.", "Alright, one sec, trying that.", "Got it, let me give that a shot."];
+const FALLBACK_STILL_BROKEN = ["Just tried it, still happening on my end, sorry.", "No luck, still doing the same thing.", "Tried that but it did not fix it."];
+const FALLBACK_RESOLVED = ["That actually worked, thank you!", "Yep, that fixed it, working now.", "Confirmed, all good on my end now, thanks for the help."];
+
+function isConfirmAsk(text) {
+  return /confirm|resolved|closing|close this|working now|does (that|it) work|did that|let me know if|fixed on your end|all set/i.test(text || "");
+}
+
+function pickFallback(ticket, agentText) {
+  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  if (ticket.resolved) return { text: pick(FALLBACK_RESOLVED), resolved: true };
+  if (isConfirmAsk(agentText)) {
+    if (ticket.attempts >= 2) return { text: pick(FALLBACK_RESOLVED), resolved: true };
+    return { text: pick(FALLBACK_STILL_BROKEN), resolved: false };
+  }
+  return { text: pick(FALLBACK_TRYING), resolved: false };
+}
 
 /* ---------------------------------------------------------------------- */
 /*  THEME TOKENS                                                          */
