@@ -322,7 +322,8 @@ export default function HelpdeskSimulator() {
   const callEndRef = useRef(null);
 
   const isDark = settings.theme === "dark";
-  const t = theme(isDark);
+  const isL2 = settings.tier === "L2";
+  const t = theme(isDark, settings.tier);
   const density = settings.density === "compact" ? "py-2" : "py-3";
   const fontSizeClass = settings.fontSize === "small" ? "text-[13px]" : settings.fontSize === "large" ? "text-[16px]" : "text-[14px]";
 
