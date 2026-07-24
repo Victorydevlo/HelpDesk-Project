@@ -207,3 +207,104 @@ function timeAgo(iso, now) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
+/* ---------------------------------------------------------------------- */
+/*  MAIN APP                                                               */
+/* ---------------------------------------------------------------------- */
+
+export default function HelpdeskSimulator() {
+  const [ready, setReady] = useState(false);
+  const [tickets, setTickets] = useState([]);
+  const [settings, setSettings] = useState({
+    theme: "dark", agentName: "Agent", agentStatus: "Available",
+    soundEnabled: true, autoRefresh: false, slaWarnPct: 75,
+    density: "comfortable", fontSize: "medium",
+  });
+  const [screen, setScreen] = useState("dashboard");
+  const [selectedId, setSelectedId] = useState(null);
+  const [queueFilter, setQueueFilter] = useState("All");
+  const [queueSearch, setQueueSearch] = useState("");
+  const [kbQuery, setKbQuery] = useState("");
+  const [openKb, setOpenKb] = useState(null);
+  const [replyText, setReplyText] = useState("");
+  const [aiTyping, setAiTyping] = useState(false);
+  const [detailTab, setDetailTab] = useState("conversation");
+  const [noteText, setNoteText] = useState("");
+  const [termHistory, setTermHistory] = useState([{ type: "out", text: "RELAY diagnostics terminal — type 'help' for commands." }]);
+  const [termInput, setTermInput] = useState("");
+  const [termTicketId, setTermTicketId] = useState(null);
+  const [toasts, setToasts] = useState([]);
+  const [now, setNow] = useState(Date.now());
+  const termEndRef = useRef(null);
+  const chatEndRef = useRef(null);
+
+  const isDark = settings.theme === "dark";
+  const t = theme(isDark);
+  const density = settings.density === "compact" ? "py-2" : "py-3";
+  const fontSizeClass = settings.fontSize === "small" ? "text-[13px]" : settings.fontSize === "large" ? "text-[16px]" : "text-[14px]";
+
+  /* ---------- persistence ---------- */
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await window.storage.get("relay-helpdesk-state", false);
+        if (res && res.value) {
+          const parsed = JSON.parse(res.value);
+          setTickets(parsed.tickets && parsed.tickets.length ? parsed.tickets : seedTickets());
+          setSettings((s) => ({ ...s, ...parsed.settings }));
+        } else {
+          setTickets(seedTickets());
+        }
+      } catch (e) {
+        setTickets(seedTickets());
+      }
+      setReady(true);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    const save = async () => {
+      try {
+        await window.storage.set("relay-helpdesk-state", JSON.stringify({ tickets, settings }), false);
+      } catch (e) { /* non-fatal */ }
+    };
+    save();
+  }, [tickets, settings, ready]);
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    if (!settings.autoRefresh) return;
+    const id = setInterval(() => pushToast("Queue refreshed", "info"), 30000);
+    return () => clearInterval(id);
+  }, [settings.autoRefresh]);
+
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [selectedId, tickets, aiTyping, detailTab]);
+  useEffect(() => { termEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [termHistory]);
+
+  function pushToast(msg, kind = "info") {
+    const id = Math.random().toString(36).slice(2);
+    setToasts((ts) => [...ts, { id, msg, kind }]);
+    setTimeout(() => setToasts((ts) => ts.filter((x) => x.id !== id)), 3200);
+  }
+
+  const selected = tickets.find((tk) => tk.id === selectedId) || null;
+
+  /* ---------- derived metrics ---------- */
+  const metrics = useMemo(() => {
+    const byStatus = {};
+    STATUS_LIST.forEach((s) => (byStatus[s] = 0));
+    let breached = 0;
+    tickets.forEach((tk) => {
+      byStatus[tk.status] = (byStatus[tk.status] || 0) + 1;
+      if (tk.status !== "Resolved" && tk.status !== "Closed" && new Date(tk.dueAt).getTime() < now) breached++;
+    });
+    const byCategory = {};
+    tickets.forEach((tk) => (byCategory[tk.category] = (byCategory[tk.category] || 0) + 1));
+    const open = tickets.filter((tk) => tk.status !== "Resolved" && tk.status !== "Closed").length;
+    return { byStatus, breached, byCategory, open, total: tickets.length };
+  }, [tickets, now]);
+
