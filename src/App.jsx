@@ -308,3 +308,112 @@ export default function HelpdeskSimulator() {
     return { byStatus, breached, byCategory, open, total: tickets.length };
   }, [tickets, now]);
 
+  /* ---------- ticket actions ---------- */
+  function updateTicket(id, patch) {
+    setTickets((ts) => ts.map((tk) => (tk.id === id ? { ...tk, ...patch } : tk)));
+  }
+
+  function changeStatus(id, status) {
+    updateTicket(id, { status });
+    pushToast(`${id} marked ${status}`, "success");
+  }
+
+  function changePriority(id, priority) {
+    const tk = tickets.find((x) => x.id === id);
+    const created = new Date(tk.createdAt).getTime();
+    const dueAt = new Date(created + PRIORITY_META[priority].hours * 3600000).toISOString();
+    updateTicket(id, { priority, dueAt });
+    pushToast(`${id} priority set to ${priority}`, "success");
+  }
+
+  function addNote(id) {
+    if (!noteText.trim()) return;
+    setTickets((ts) => ts.map((tk) => (tk.id === id ? { ...tk, notes: [...tk.notes, { id: Math.random().toString(36).slice(2), text: noteText, time: new Date().toISOString() }] } : tk)));
+    setNoteText("");
+  }
+
+  async function sendReply(id) {
+    if (!replyText.trim()) return;
+    const text = replyText;
+    setReplyText("");
+    const agentMsg = { id: Math.random().toString(36).slice(2), sender: "agent", text, time: new Date().toISOString() };
+    setTickets((ts) => ts.map((tk) => (tk.id === id ? { ...tk, thread: [...tk.thread, agentMsg], status: tk.status === "New" ? "Open" : tk.status } : tk)));
+    if (settings.soundEnabled) { /* sound cue placeholder */ }
+    setAiTyping(true);
+    const tk = tickets.find((x) => x.id === id);
+    try {
+      const systemPrompt = `You are role-playing as ${tk.requester}, a ${tk.dept} department employee in a corporate IT helpdesk TRAINING SIMULATION. Your reported issue: "${tk.description}" Stay fully in character as a realistic, moderately non-technical employee — a little frustrated or relieved depending on progress, natural everyday language, 1-3 short sentences. Never break character, never mention this is a simulation or that you are an AI.`;
+      const history = [...tk.thread, agentMsg].map((m) => ({ role: m.sender === "customer" ? "assistant" : "user", content: m.text }));
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 200, system: systemPrompt, messages: history }),
+      });
+      const data = await res.json();
+      const replyBlocks = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
+      const custText = replyBlocks || FALLBACK_REPLIES[Math.floor(Math.random() * FALLBACK_REPLIES.length)];
+      const custMsg = { id: Math.random().toString(36).slice(2), sender: "customer", text: custText, time: new Date().toISOString() };
+      setTickets((ts) => ts.map((x) => (x.id === id ? { ...x, thread: [...x.thread, custMsg] } : x)));
+    } catch (e) {
+      const custMsg = { id: Math.random().toString(36).slice(2), sender: "customer", text: FALLBACK_REPLIES[Math.floor(Math.random() * FALLBACK_REPLIES.length)], time: new Date().toISOString() };
+      setTickets((ts) => ts.map((x) => (x.id === id ? { ...x, thread: [...x.thread, custMsg] } : x)));
+    } finally {
+      setAiTyping(false);
+    }
+  }
+
+  /* ---------- diagnostics terminal ---------- */
+  function runCommand(raw) {
+    const cmd = raw.trim();
+    if (!cmd) return;
+    const device = termTicketId ? tickets.find((tk) => tk.id === termTicketId)?.device : null;
+    const host = device?.host || "WKS-GENERIC-0001";
+    const ip = device?.ip || "10.44.1.100";
+    const [base, ...args] = cmd.split(" ");
+    let out = [];
+    switch (base.toLowerCase()) {
+      case "help":
+        out = ["Available: ping <host>, ipconfig, nslookup <host>, tracert <host>, systeminfo, netstat, whoami, clear"];
+        break;
+      case "ping": {
+        const target = args[0] || "8.8.8.8";
+        out = [`Pinging ${target} with 32 bytes of data:`];
+        for (let i = 0; i < 4; i++) out.push(`Reply from ${target}: bytes=32 time=${(8 + Math.random() * 30).toFixed(0)}ms TTL=118`);
+        out.push(`Packets: Sent = 4, Received = 4, Lost = 0 (0% loss)`);
+        break;
+      }
+      case "ipconfig":
+      case "ifconfig":
+        out = [`Host: ${host}`, `IPv4 Address: ${ip}`, `Subnet Mask: 255.255.255.0`, `Default Gateway: 10.44.1.1`, `DNS Servers: 10.44.0.10, 10.44.0.11`];
+        break;
+      case "nslookup": {
+        const target = args[0] || "internal.corp.local";
+        out = [`Server: dns01.corp.local`, `Address: 10.44.0.10`, ``, `Non-authoritative answer:`, `Name: ${target}`, `Address: 10.44.${Math.floor(Math.random() * 50)}.${Math.floor(Math.random() * 250)}`];
+        break;
+      }
+      case "tracert":
+      case "traceroute": {
+        const target = args[0] || "internal.corp.local";
+        out = [`Tracing route to ${target}:`];
+        for (let i = 1; i <= 5; i++) out.push(`  ${i}  ${(2 + i * 3).toFixed(0)} ms  10.44.${i}.1`);
+        out.push("Trace complete.");
+        break;
+      }
+      case "systeminfo":
+        out = [`Host Name: ${host}`, `OS: ${device?.os || "Windows 11 23H2"}`, `System Boot Time: ${new Date(now - 3600000 * 5).toLocaleString()}`, `Total Physical Memory: 16,384 MB`, `Available Physical Memory: ${(2 + Math.random() * 4).toFixed(1)} GB`];
+        break;
+      case "netstat":
+        out = ["Proto  Local Address        Foreign Address       State", "TCP    " + ip + ":51422      13.107.42.14:443      ESTABLISHED", "TCP    " + ip + ":51500      10.44.0.20:445        ESTABLISHED"];
+        break;
+      case "whoami":
+        out = [`corp\\${(device?.host || "user").toLowerCase()}`];
+        break;
+      case "clear":
+        setTermHistory([{ type: "out", text: "RELAY diagnostics terminal — type 'help' for commands." }]);
+        return;
+      default:
+        out = [`'${base}' is not recognized. Type 'help' for available commands.`];
+    }
+    setTermHistory((h) => [...h, { type: "in", text: cmd }, ...out.map((line) => ({ type: "out", text: line }))]);
+  }
+
