@@ -257,7 +257,7 @@ export default function HelpdeskSimulator() {
   const [settings, setSettings] = useState({
     theme: "dark", agentName: "Agent", agentStatus: "Available",
     soundEnabled: true, autoRefresh: false, slaWarnPct: 75,
-    density: "comfortable", fontSize: "medium",
+    density: "comfortable", fontSize: "medium", vipCallsEnabled: true,
   });
   const [screen, setScreen] = useState("dashboard");
   const [selectedId, setSelectedId] = useState(null);
