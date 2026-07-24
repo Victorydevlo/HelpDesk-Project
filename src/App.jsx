@@ -344,6 +344,16 @@ export default function HelpdeskSimulator() {
     return () => clearTimeout(id);
   }, [ready, settings.vipCallsEnabled, incomingCall, activeCall]);
 
+  // Auto-decline (miss) a call that rings too long without being answered.
+  useEffect(() => {
+    if (!incomingCall) return;
+    const id = setTimeout(() => {
+      logUnanswered(incomingCall, "missed");
+      setIncomingCall(null);
+    }, 16000);
+    return () => clearTimeout(id);
+  }, [incomingCall]);
+
   function pushToast(msg, kind = "info") {
     const id = Math.random().toString(36).slice(2);
     setToasts((ts) => [...ts, { id, msg, kind }]);
