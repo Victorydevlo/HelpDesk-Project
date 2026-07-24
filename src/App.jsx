@@ -187,7 +187,8 @@ function seedInfra() {
 /*  THEME TOKENS                                                          */
 /* ---------------------------------------------------------------------- */
 
-function theme(isDark) {
+function theme(isDark, tier) {
+  const isL2 = tier === "L2";
   return {
     appBg: isDark ? "bg-slate-950" : "bg-slate-100",
     panel: isDark ? "bg-slate-900" : "bg-white",
@@ -198,10 +199,19 @@ function theme(isDark) {
     textFaint: isDark ? "text-slate-500" : "text-slate-400",
     hover: isDark ? "hover:bg-slate-800" : "hover:bg-slate-100",
     active: isDark ? "bg-slate-800" : "bg-slate-200",
-    accent: "text-cyan-500",
-    accentBg: isDark ? "bg-cyan-500" : "bg-cyan-600",
+    accent: isL2 ? "text-violet-500" : "text-cyan-500",
+    accentBg: isL2 ? (isDark ? "bg-violet-500" : "bg-violet-600") : (isDark ? "bg-cyan-500" : "bg-cyan-600"),
+    // Brand tokens shift from cyan (L1) to violet (L2) so the whole console
+    // visibly reskins when the support tier changes.
+    brand: isL2 ? "violet" : "cyan",
+    brandText: isL2 ? "text-violet-500" : "text-cyan-500",
+    brandBg: isL2 ? "bg-violet-500" : "bg-cyan-500",
+    brandBorder: isL2 ? "border-violet-500" : "border-cyan-500",
+    brandRing: isL2 ? "ring-violet-500/30" : "ring-cyan-500/30",
+    brandSoftBg: isL2 ? "bg-violet-500/10" : "bg-cyan-500/10",
+    brandOnColor: isL2 ? "text-slate-950" : "text-slate-950",
     input: isDark ? "bg-slate-800 border-slate-700 text-slate-100 placeholder-slate-500" : "bg-white border-slate-300 text-slate-900 placeholder-slate-400",
-    ring: isDark ? "focus:ring-cyan-500" : "focus:ring-cyan-600",
+    ring: isL2 ? (isDark ? "focus:ring-violet-500" : "focus:ring-violet-600") : (isDark ? "focus:ring-cyan-500" : "focus:ring-cyan-600"),
   };
 }
 
