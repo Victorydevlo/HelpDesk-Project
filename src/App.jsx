@@ -332,6 +332,18 @@ export default function HelpdeskSimulator() {
   useEffect(() => { termEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [termHistory]);
   useEffect(() => { callEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [activeCall]);
 
+  // Schedule a random incoming VIP call whenever nothing is currently ringing
+  // or in progress. Reschedules itself once that call is handled.
+  useEffect(() => {
+    if (!ready || !settings.vipCallsEnabled || incomingCall || activeCall) return;
+    const delay = 45000 + Math.random() * 45000; // 45–90s
+    const id = setTimeout(() => {
+      const persona = VIP_CALLERS[Math.floor(Math.random() * VIP_CALLERS.length)];
+      setIncomingCall({ id: Math.random().toString(36).slice(2), ...persona });
+    }, delay);
+    return () => clearTimeout(id);
+  }, [ready, settings.vipCallsEnabled, incomingCall, activeCall]);
+
   function pushToast(msg, kind = "info") {
     const id = Math.random().toString(36).slice(2);
     setToasts((ts) => [...ts, { id, msg, kind }]);
