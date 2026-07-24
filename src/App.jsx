@@ -394,6 +394,34 @@ export default function HelpdeskSimulator() {
     setIncomingCall(null);
   }
 
+  function endCall() {
+    if (!activeCall) return;
+    const durationMs = Date.now() - activeCall.startedAt;
+    const mins = Math.floor(durationMs / 60000);
+    const secs = Math.floor((durationMs % 60000) / 1000);
+    const priority = priorityForRole(activeCall.title);
+    const short = activeCall.issue.length > 60 ? activeCall.issue.slice(0, 60) + "…" : activeCall.issue;
+    const newTicket = {
+      id: `TCK-C${Math.floor(1000 + Math.random() * 8999)}`,
+      subject: `Phone call — ${activeCall.caller} (${activeCall.title}): ${short}`,
+      requester: activeCall.caller, dept: activeCall.dept, priority, status: "Open", category: "Phone Call",
+      createdAt: new Date(activeCall.startedAt).toISOString(),
+      dueAt: new Date(activeCall.startedAt + PRIORITY_META[priority].hours * 3600000).toISOString(),
+      device: { host: "N/A — phone call", os: "N/A", ip: "N/A" },
+      description: activeCall.issue,
+      assigned: "You",
+      thread: activeCall.transcript.map((m, i) => ({ id: `call-${i}`, sender: m.sender === "caller" ? "customer" : "agent", text: m.text, time: m.time })),
+      notes: [{ id: Math.random().toString(36).slice(2), text: `Logged automatically from a ${mins}m ${secs}s phone call.`, time: new Date().toISOString() }],
+      resolved: false, attempts: 0,
+    };
+    setTickets((ts) => [newTicket, ...ts]);
+    pushToast(`Call logged as ${newTicket.id}`, "success");
+    setActiveCall(null);
+    setCallInput("");
+    setScreen("queue");
+    setSelectedId(newTicket.id);
+  }
+
   const selected = tickets.find((tk) => tk.id === selectedId) || null;
 
   /* ---------- derived metrics ---------- */
