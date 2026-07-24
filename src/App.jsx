@@ -360,6 +360,26 @@ export default function HelpdeskSimulator() {
     setTimeout(() => setToasts((ts) => ts.filter((x) => x.id !== id)), 3200);
   }
 
+  /* ---------- phone calls ---------- */
+  function logUnanswered(call, reason) {
+    const priority = priorityForRole(call.title);
+    const ticket = {
+      id: `TCK-C${Math.floor(1000 + Math.random() * 8999)}`,
+      subject: `${reason === "declined" ? "Declined" : "Missed"} call — ${call.caller} (${call.title})`,
+      requester: call.caller, dept: call.dept, priority, status: "New", category: "Phone Call",
+      createdAt: new Date().toISOString(),
+      dueAt: new Date(Date.now() + PRIORITY_META[priority].hours * 3600000).toISOString(),
+      device: { host: "N/A — phone call", os: "N/A", ip: "N/A" },
+      description: call.issue,
+      assigned: "Unassigned",
+      thread: [{ id: Math.random().toString(36).slice(2), sender: "customer", text: reason === "declined" ? `(Call declined) ${call.issue}` : `(Missed call, no voicemail left) ${call.issue}`, time: new Date().toISOString() }],
+      notes: [],
+      resolved: false, attempts: 0,
+    };
+    setTickets((ts) => [ticket, ...ts]);
+    pushToast(`${reason === "declined" ? "Declined" : "Missed"} call from ${call.caller} logged as ${ticket.id}`, reason === "declined" ? "info" : "success");
+  }
+
   const selected = tickets.find((tk) => tk.id === selectedId) || null;
 
   /* ---------- derived metrics ---------- */
