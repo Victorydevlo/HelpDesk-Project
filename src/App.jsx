@@ -895,3 +895,43 @@ function KbScreen({ t, isDark, kbQuery, setKbQuery, filteredKb, openKb, setOpenK
   );
 }
 
+/* ---------------------------------------------------------------------- */
+/*  DIAGNOSTICS TERMINAL                                                  */
+/* ---------------------------------------------------------------------- */
+
+function DiagnosticsScreen({ t, isDark, tickets, termTicketId, setTermTicketId, termHistory, termInput, setTermInput, runCommand, termEndRef }) {
+  const openTickets = tickets.filter((tk) => tk.status !== "Closed");
+  return (
+    <div className="p-4 md:p-8 max-w-4xl">
+      <h1 className="text-xl md:text-2xl font-semibold mb-1">Diagnostics terminal</h1>
+      <p className={`text-sm ${t.textMuted} mb-4`}>Run read-only diagnostic commands against a ticket's device context.</p>
+      <div className="flex items-center gap-2 mb-3">
+        <span className={`text-xs ${t.textMuted}`}>Context:</span>
+        <select value={termTicketId || ""} onChange={(e) => setTermTicketId(e.target.value || null)}
+          className={`text-xs rounded-lg border px-2 py-1.5 ${t.input}`}>
+          <option value="">No ticket (generic device)</option>
+          {openTickets.map((tk) => <option key={tk.id} value={tk.id}>{tk.id} — {tk.device.host}</option>)}
+        </select>
+      </div>
+      <div className={`rounded-xl border ${t.border} overflow-hidden`}>
+        <div className={`px-3 py-2 text-xs font-mono flex items-center gap-1.5 border-b ${t.border} ${isDark ? "bg-slate-900" : "bg-slate-100"}`}>
+          <Terminal size={12} /> relay-diagnostics — {termTicketId ? tickets.find((tk) => tk.id === termTicketId)?.device.host : "generic"}
+        </div>
+        <div className={`h-80 overflow-y-auto p-3 font-mono text-xs space-y-1 ${isDark ? "bg-slate-950 text-emerald-400" : "bg-slate-900 text-emerald-400"}`}>
+          {termHistory.map((line, i) => (
+            <div key={i}>{line.type === "in" ? <span className="text-cyan-400">$ {line.text}</span> : <span className="text-slate-300">{line.text}</span>}</div>
+          ))}
+          <div ref={termEndRef} />
+        </div>
+        <div className={`flex items-center gap-2 px-3 py-2 border-t ${t.border} ${isDark ? "bg-slate-900" : "bg-slate-100"}`}>
+          <span className="text-cyan-500 font-mono text-xs">$</span>
+          <input value={termInput} onChange={(e) => setTermInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") { runCommand(termInput); setTermInput(""); } }}
+            placeholder="ping, ipconfig, nslookup, tracert, systeminfo, netstat, whoami, help, clear"
+            className="flex-1 bg-transparent outline-none text-xs font-mono" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
