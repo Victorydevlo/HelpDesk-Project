@@ -344,16 +344,28 @@ export default function HelpdeskSimulator() {
   }
 
   async function sendReply(id) {
-    if (!replyText.trim()) return;
+    if (!replyText.trim() || aiTyping) return; // guard: never let two replies overlap and race each other
     const text = replyText;
     setReplyText("");
     const agentMsg = { id: Math.random().toString(36).slice(2), sender: "agent", text, time: new Date().toISOString() };
     setTickets((ts) => ts.map((tk) => (tk.id === id ? { ...tk, thread: [...tk.thread, agentMsg], status: tk.status === "New" ? "Open" : tk.status } : tk)));
-    if (settings.soundEnabled) { /* sound cue placeholder */ }
     setAiTyping(true);
     const tk = tickets.find((x) => x.id === id);
+    const askingToConfirm = isConfirmAsk(text);
+    const nextAttempts = askingToConfirm ? tk.attempts : tk.attempts + 1;
+
     try {
-      const systemPrompt = `You are role-playing as ${tk.requester}, a ${tk.dept} department employee in a corporate IT helpdesk TRAINING SIMULATION. Your reported issue: "${tk.description}" Stay fully in character as a realistic, moderately non-technical employee — a little frustrated or relieved depending on progress, natural everyday language, 1-3 short sentences. Respond specifically to what the agent just said; do not repeat earlier lines. Never break character, never mention this is a simulation or that you are an AI.`;
+      const systemPrompt = `You are role-playing as ${tk.requester}, a ${tk.dept} department employee in a corporate IT helpdesk TRAINING SIMULATION. Your reported issue: "${tk.description}"
+
+Current state: the issue is currently ${tk.resolved ? "RESOLVED — you already confirmed the fix worked" : "UNRESOLVED — still ongoing"}. There have been ${tk.attempts} prior troubleshooting attempt(s) in this conversation.
+
+Rules:
+- Stay fully in character: realistic, moderately non-technical, natural everyday language, 1-3 short sentences.
+- Respond specifically to what the agent just said — never repeat an earlier line verbatim.
+- Be internally consistent: do NOT contradict something you already told the agent earlier in this thread (e.g. don't say it's broken again right after confirming it was fixed, and don't stay silent about the outcome if the agent is asking you to try something and report back).
+- If the issue is already RESOLVED, acknowledge that positively and don't reopen it unless the agent describes a new, different problem.
+- If the agent asks you to confirm whether a fix worked, actually give a real yes/no update based on the conversation so far rather than a vague "trying it" reply.
+- Never break character, never mention this is a simulation or that you are an AI.`;
 
       // The Anthropic API requires messages to start with role "user" and to
       // strictly alternate user/assistant turns. Our thread starts with the
@@ -377,17 +389,36 @@ export default function HelpdeskSimulator() {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 200, system: systemPrompt, messages: apiMessages }),
+        body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 220, system: systemPrompt, messages: apiMessages }),
       });
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data?.error?.message || "API error");
       const replyBlocks = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
-      const custText = replyBlocks || FALLBACK_REPLIES[Math.floor(Math.random() * FALLBACK_REPLIES.length)];
+
+      let custText, nowResolved;
+      if (replyBlocks) {
+        custText = replyBlocks;
+        // Heuristic read of the model's own reply to keep our local resolved
+        // flag in sync with what it just said, so future turns don't drift.
+        if (/fix|work(s|ed|ing)? now|resolved|thank you|thanks,? that|all good|confirmed/i.test(replyBlocks) && !/not work|still (broken|happening|the same)|didn.?t (work|fix)/i.test(replyBlocks)) {
+          nowResolved = tk.resolved || (askingToConfirm && true);
+        } else if (/not work|still (broken|happening|the same)|didn.?t (work|fix)/i.test(replyBlocks)) {
+          nowResolved = false;
+        } else {
+          nowResolved = tk.resolved;
+        }
+      } else {
+        const fb = pickFallback(tk, text);
+        custText = fb.text;
+        nowResolved = fb.resolved;
+      }
+
       const custMsg = { id: Math.random().toString(36).slice(2), sender: "customer", text: custText, time: new Date().toISOString() };
-      setTickets((ts) => ts.map((x) => (x.id === id ? { ...x, thread: [...x.thread, custMsg] } : x)));
+      setTickets((ts) => ts.map((x) => (x.id === id ? { ...x, thread: [...x.thread, custMsg], resolved: nowResolved, attempts: nextAttempts } : x)));
     } catch (e) {
-      const custMsg = { id: Math.random().toString(36).slice(2), sender: "customer", text: FALLBACK_REPLIES[Math.floor(Math.random() * FALLBACK_REPLIES.length)], time: new Date().toISOString() };
-      setTickets((ts) => ts.map((x) => (x.id === id ? { ...x, thread: [...x.thread, custMsg] } : x)));
+      const fb = pickFallback(tk, text);
+      const custMsg = { id: Math.random().toString(36).slice(2), sender: "customer", text: fb.text, time: new Date().toISOString() };
+      setTickets((ts) => ts.map((x) => (x.id === id ? { ...x, thread: [...x.thread, custMsg], resolved: fb.resolved, attempts: nextAttempts } : x)));
     } finally {
       setAiTyping(false);
     }
