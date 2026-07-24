@@ -293,6 +293,7 @@ export default function HelpdeskSimulator() {
     theme: "dark", agentName: "Agent", agentStatus: "Available",
     soundEnabled: true, autoRefresh: false, slaWarnPct: 75,
     density: "comfortable", fontSize: "medium", vipCallsEnabled: true,
+    tier: "L1",
   });
   const [screen, setScreen] = useState("dashboard");
   const [selectedId, setSelectedId] = useState(null);
