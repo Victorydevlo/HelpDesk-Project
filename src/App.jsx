@@ -682,3 +682,52 @@ function DashboardScreen({ t, isDark, metrics, tickets, now, settings, goQueue }
   );
 }
 
+/* ---------------------------------------------------------------------- */
+/*  QUEUE LIST                                                            */
+/* ---------------------------------------------------------------------- */
+
+function QueueList({ t, tickets, selectedId, setSelectedId, now, settings, queueFilter, setQueueFilter, queueSearch, setQueueSearch, density, mobile }) {
+  return (
+    <div className={mobile ? "" : "flex flex-col h-screen"}>
+      <div className={`p-3 border-b ${t.border} space-y-2 sticky top-0 z-10 ${t.panel}`}>
+        <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border ${t.input}`}>
+          <Search size={14} className={t.textFaint} />
+          <input value={queueSearch} onChange={(e) => setQueueSearch(e.target.value)} placeholder="Search tickets…"
+            className="bg-transparent outline-none text-sm flex-1" />
+        </div>
+        <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
+          {["All", ...STATUS_LIST].map((f) => (
+            <button key={f} onClick={() => setQueueFilter(f)}
+              className={`px-2.5 py-1 rounded-full text-xs shrink-0 border ${queueFilter === f ? "bg-cyan-500 border-cyan-500 text-slate-950 font-medium" : `${t.border} ${t.textMuted}`}`}>
+              {f}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className={mobile ? "" : "flex-1 overflow-y-auto"}>
+        {tickets.length === 0 && <div className={`p-6 text-sm text-center ${t.textFaint}`}>No tickets match this view.</div>}
+        {tickets.map((tk) => {
+          const Icon = CATEGORY_ICON[tk.category] || FileText;
+          return (
+            <button key={tk.id} onClick={() => setSelectedId(tk.id)}
+              className={`w-full text-left px-4 ${density} border-b ${t.border} ${selectedId === tk.id ? t.active : t.hover} transition-colors`}>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <span className={`text-xs font-mono ${t.textFaint}`}>{tk.id}</span>
+                <PriorityBadge priority={tk.priority} />
+              </div>
+              <div className="text-sm font-medium mb-1 truncate">{tk.subject}</div>
+              <div className={`flex items-center gap-2 text-xs ${t.textMuted}`}>
+                <Icon size={12} /> <span className="truncate">{tk.requester} · {tk.dept}</span>
+              </div>
+              <div className="flex items-center justify-between mt-1.5">
+                <StatusBadge status={tk.status} />
+                <SlaTimer ticket={tk} now={now} t={t} warnPct={settings.slaWarnPct} />
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
