@@ -595,3 +595,90 @@ export default function HelpdeskSimulator() {
   );
 }
 
+/* ---------------------------------------------------------------------- */
+/*  DASHBOARD                                                             */
+/* ---------------------------------------------------------------------- */
+
+function DashboardScreen({ t, isDark, metrics, tickets, now, settings, goQueue }) {
+  const cards = [
+    { label: "Open tickets", value: metrics.open, icon: Inbox, tone: "text-cyan-500", filter: "Open" },
+    { label: "SLA breached", value: metrics.breached, icon: AlertTriangle, tone: "text-rose-500", filter: "All" },
+    { label: "Resolved today", value: metrics.byStatus.Resolved, icon: CheckCircle2, tone: "text-emerald-500", filter: "Resolved" },
+    { label: "Total tickets", value: metrics.total, icon: TrendingUp, tone: "text-violet-500", filter: "All" },
+  ];
+  const maxCat = Math.max(1, ...Object.values(metrics.byCategory));
+  return (
+    <div className="p-4 md:p-8 max-w-6xl">
+      <div className="mb-6">
+        <h1 className="text-xl md:text-2xl font-semibold">Console overview</h1>
+        <p className={`text-sm ${t.textMuted} mt-1`}>Live snapshot of the simulated queue. This is a training environment — tickets, timers and the customer chat are all simulated.</p>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        {cards.map((c) => (
+          <button key={c.label} onClick={() => goQueue(c.filter)} className={`text-left p-4 rounded-xl border ${t.border} ${t.panel} ${t.hover} transition-colors`}>
+            <c.icon size={17} className={c.tone} />
+            <div className="text-2xl font-semibold mt-2 font-mono">{c.value}</div>
+            <div className={`text-xs ${t.textMuted} mt-0.5`}>{c.label}</div>
+          </button>
+        ))}
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-4">
+        <div className={`p-4 rounded-xl border ${t.border} ${t.panel}`}>
+          <h2 className="text-sm font-medium mb-3">Tickets by status</h2>
+          <div className="space-y-2.5">
+            {STATUS_LIST.map((s) => {
+              const c = STATUS_COLORS[s];
+              const val = metrics.byStatus[s] || 0;
+              const pct = metrics.total ? (val / metrics.total) * 100 : 0;
+              return (
+                <div key={s}>
+                  <div className="flex justify-between text-xs mb-1"><span className={t.textMuted}>{s}</span><span className="font-mono">{val}</span></div>
+                  <div className={`h-1.5 rounded-full ${isDark ? "bg-slate-800" : "bg-slate-200"}`}>
+                    <div className={`h-1.5 rounded-full ${c.text.replace("text-", "bg-")}`} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className={`p-4 rounded-xl border ${t.border} ${t.panel}`}>
+          <h2 className="text-sm font-medium mb-3">Volume by category</h2>
+          <div className="space-y-2">
+            {Object.entries(metrics.byCategory).map(([cat, val]) => {
+              const Icon = CATEGORY_ICON[cat] || FileText;
+              return (
+                <div key={cat} className="flex items-center gap-2">
+                  <Icon size={13} className={t.textFaint} />
+                  <span className={`text-xs w-32 shrink-0 truncate ${t.textMuted}`}>{cat}</span>
+                  <div className={`flex-1 h-2 rounded-full ${isDark ? "bg-slate-800" : "bg-slate-200"}`}>
+                    <div className="h-2 rounded-full bg-cyan-500" style={{ width: `${(val / maxCat) * 100}%` }} />
+                  </div>
+                  <span className="text-xs font-mono w-4 text-right">{val}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className={`mt-4 p-4 rounded-xl border ${t.border} ${t.panel}`}>
+        <h2 className="text-sm font-medium mb-3">Highest-urgency open tickets</h2>
+        <div className="space-y-1">
+          {tickets.filter((tk) => tk.status !== "Resolved" && tk.status !== "Closed")
+            .sort((a, b) => PRIORITY_META[a.priority].order - PRIORITY_META[b.priority].order).slice(0, 4)
+            .map((tk) => (
+              <div key={tk.id} className={`flex items-center gap-3 py-2 border-b last:border-0 ${t.border}`}>
+                <PriorityBadge priority={tk.priority} />
+                <span className="text-sm flex-1 truncate">{tk.subject}</span>
+                <SlaTimer ticket={tk} now={now} t={t} warnPct={settings.slaWarnPct} />
+              </div>
+            ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
