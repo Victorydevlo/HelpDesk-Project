@@ -342,14 +342,34 @@ export default function HelpdeskSimulator() {
     setAiTyping(true);
     const tk = tickets.find((x) => x.id === id);
     try {
-      const systemPrompt = `You are role-playing as ${tk.requester}, a ${tk.dept} department employee in a corporate IT helpdesk TRAINING SIMULATION. Your reported issue: "${tk.description}" Stay fully in character as a realistic, moderately non-technical employee — a little frustrated or relieved depending on progress, natural everyday language, 1-3 short sentences. Never break character, never mention this is a simulation or that you are an AI.`;
-      const history = [...tk.thread, agentMsg].map((m) => ({ role: m.sender === "customer" ? "assistant" : "user", content: m.text }));
+      const systemPrompt = `You are role-playing as ${tk.requester}, a ${tk.dept} department employee in a corporate IT helpdesk TRAINING SIMULATION. Your reported issue: "${tk.description}" Stay fully in character as a realistic, moderately non-technical employee — a little frustrated or relieved depending on progress, natural everyday language, 1-3 short sentences. Respond specifically to what the agent just said; do not repeat earlier lines. Never break character, never mention this is a simulation or that you are an AI.`;
+
+      // The Anthropic API requires messages to start with role "user" and to
+      // strictly alternate user/assistant turns. Our thread starts with the
+      // customer (mapped to "assistant"), so we trim to the first agent turn
+      // and merge any consecutive same-role messages before sending.
+      const roleFor = (sender) => (sender === "customer" ? "assistant" : "user");
+      const rawHistory = [...tk.thread, agentMsg];
+      let startIdx = rawHistory.findIndex((m) => roleFor(m.sender) === "user");
+      if (startIdx === -1) startIdx = 0;
+      const apiMessages = [];
+      rawHistory.slice(startIdx).forEach((m) => {
+        const role = roleFor(m.sender);
+        const last = apiMessages[apiMessages.length - 1];
+        if (last && last.role === role) last.content += "\n" + m.text;
+        else apiMessages.push({ role, content: m.text });
+      });
+      if (apiMessages.length === 0 || apiMessages[apiMessages.length - 1].role !== "user") {
+        apiMessages.push({ role: "user", content: agentMsg.text });
+      }
+
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 200, system: systemPrompt, messages: history }),
+        body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 200, system: systemPrompt, messages: apiMessages }),
       });
       const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data?.error?.message || "API error");
       const replyBlocks = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
       const custText = replyBlocks || FALLBACK_REPLIES[Math.floor(Math.random() * FALLBACK_REPLIES.length)];
       const custMsg = { id: Math.random().toString(36).slice(2), sender: "customer", text: custText, time: new Date().toISOString() };
