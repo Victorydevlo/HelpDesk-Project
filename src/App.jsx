@@ -272,6 +272,11 @@ export default function HelpdeskSimulator() {
   const [termHistory, setTermHistory] = useState([{ type: "out", text: "RELAY diagnostics terminal — type 'help' for commands." }]);
   const [termInput, setTermInput] = useState("");
   const [termTicketId, setTermTicketId] = useState(null);
+  const [incomingCall, setIncomingCall] = useState(null);
+  const [activeCall, setActiveCall] = useState(null);
+  const [callInput, setCallInput] = useState("");
+  const [callSending, setCallSending] = useState(false);
+  const [callMuted, setCallMuted] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [now, setNow] = useState(Date.now());
   const termEndRef = useRef(null);
