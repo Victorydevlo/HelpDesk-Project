@@ -422,6 +422,12 @@ export default function HelpdeskSimulator() {
     setSelectedId(newTicket.id);
   }
 
+  function triggerTestCall() {
+    if (incomingCall || activeCall) return;
+    const persona = VIP_CALLERS[Math.floor(Math.random() * VIP_CALLERS.length)];
+    setIncomingCall({ id: Math.random().toString(36).slice(2), ...persona });
+  }
+
   const selected = tickets.find((tk) => tk.id === selectedId) || null;
 
   /* ---------- derived metrics ---------- */
