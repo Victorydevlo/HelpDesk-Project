@@ -4,7 +4,8 @@ import {
   Sun, Moon, Search, Bell, ChevronLeft, Send, AlertTriangle, CheckCircle2,
   Clock, User, ShieldAlert, ArrowLeft, RefreshCw, Volume2, VolumeX,
   Wifi, HardDrive, Mail, Printer, KeyRound, Bug, Laptop, Monitor as MonitorIcon,
-  FileText, Zap, ChevronRight, X, StickyNote, Wrench, TrendingUp, Users, Timer
+  FileText, Zap, ChevronRight, X, StickyNote, Wrench, TrendingUp, Users, Timer,
+  Phone, PhoneCall, PhoneOff, Mic, MicOff, PhoneIncoming
 } from "lucide-react";
 
 /* ---------------------------------------------------------------------- */
