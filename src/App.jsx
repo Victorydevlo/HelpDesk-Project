@@ -371,6 +371,14 @@ export default function HelpdeskSimulator() {
   useEffect(() => { termEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [termHistory]);
   useEffect(() => { callEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [activeCall]);
 
+  // If the agent switches back to L1 while viewing an L2-only screen, bounce to the dashboard.
+  useEffect(() => {
+    if (!isL2 && (screen === "escalations" || screen === "infra")) {
+      setScreen("dashboard");
+      setSelectedId(null);
+    }
+  }, [isL2, screen]);
+
   // Schedule a random incoming VIP call whenever nothing is currently ringing
   // or in progress. Reschedules itself once that call is handled.
   useEffect(() => {
