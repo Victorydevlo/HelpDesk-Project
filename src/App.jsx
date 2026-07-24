@@ -812,7 +812,8 @@ Rules:
           )}
 
           {screen === "settings" && (
-            <SettingsScreen t={t} isDark={isDark} settings={settings} setSettings={setSettings} resetSimulation={resetSimulation} pushToast={pushToast} />
+            <SettingsScreen t={t} isDark={isDark} settings={settings} setSettings={setSettings} resetSimulation={resetSimulation} pushToast={pushToast}
+              triggerTestCall={triggerTestCall} callInProgress={!!incomingCall || !!activeCall} />
           )}
         </main>
       </div>
@@ -1306,7 +1307,7 @@ function SettingRow({ label, desc, children, t }) {
   );
 }
 
-function SettingsScreen({ t, isDark, settings, setSettings, resetSimulation, pushToast }) {
+function SettingsScreen({ t, isDark, settings, setSettings, resetSimulation, pushToast, triggerTestCall, callInProgress }) {
   const set = (k, v) => setSettings((s) => ({ ...s, [k]: v }));
   return (
     <div className="p-4 md:p-8 max-w-2xl">
@@ -1361,6 +1362,18 @@ function SettingsScreen({ t, isDark, settings, setSettings, resetSimulation, pus
             <input type="range" min="40" max="95" value={settings.slaWarnPct} onChange={(e) => set("slaWarnPct", Number(e.target.value))} />
             <span className="text-xs font-mono w-9">{settings.slaWarnPct}%</span>
           </div>
+        </SettingRow>
+      </div>
+
+      <div className={`p-4 rounded-xl border ${t.border} ${t.panel} mb-4`}>
+        <h2 className="text-sm font-medium mb-1">Phone calls</h2>
+        <SettingRow t={t} label="Random VIP calls" desc="Occasionally get a live call from a CEO or manager needing help">
+          <Toggle t={t} on={settings.vipCallsEnabled} onClick={() => set("vipCallsEnabled", !settings.vipCallsEnabled)} />
+        </SettingRow>
+        <SettingRow t={t} label="Test the call flow" desc="Trigger an incoming call right now">
+          <button onClick={triggerTestCall} disabled={callInProgress} className={`text-xs px-3 py-1.5 rounded-lg border ${t.border} ${t.hover} disabled:opacity-40 flex items-center gap-1`}>
+            <PhoneIncoming size={12} /> Simulate call
+          </button>
         </SettingRow>
       </div>
 
