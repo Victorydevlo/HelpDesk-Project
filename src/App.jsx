@@ -428,6 +428,48 @@ export default function HelpdeskSimulator() {
     setIncomingCall({ id: Math.random().toString(36).slice(2), ...persona });
   }
 
+  async function sendCallMessage() {
+    if (!callInput.trim() || callSending || !activeCall || callMuted) return;
+    const text = callInput;
+    setCallInput("");
+    const agentMsg = { id: Math.random().toString(36).slice(2), sender: "agent", text, time: new Date().toISOString() };
+    setActiveCall((c) => (c ? { ...c, transcript: [...c.transcript, agentMsg] } : c));
+    setCallSending(true);
+    try {
+      const systemPrompt = `You are role-playing as ${activeCall.caller}, the ${activeCall.title} of the company, currently on a live phone call with an IT helpdesk agent in a TRAINING SIMULATION. Your issue: "${activeCall.issue}" You are speaking out loud, not typing — keep replies SHORT (1-2 sentences), spoken and natural, time-pressured and occasionally a little impatient given your seniority, but not rude. Respond specifically to what the agent just said, don't repeat earlier lines, and don't contradict what you already said in this call. Never break character or mention this is a simulation.`;
+      const roleFor = (sender) => (sender === "caller" ? "assistant" : "user");
+      const rawHistory = [...activeCall.transcript, agentMsg];
+      let startIdx = rawHistory.findIndex((m) => roleFor(m.sender) === "user");
+      if (startIdx === -1) startIdx = 0;
+      const apiMessages = [];
+      rawHistory.slice(startIdx).forEach((m) => {
+        const role = roleFor(m.sender);
+        const last = apiMessages[apiMessages.length - 1];
+        if (last && last.role === role) last.content += "\n" + m.text;
+        else apiMessages.push({ role, content: m.text });
+      });
+      if (apiMessages.length === 0 || apiMessages[apiMessages.length - 1].role !== "user") {
+        apiMessages.push({ role: "user", content: agentMsg.text });
+      }
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 150, system: systemPrompt, messages: apiMessages }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data?.error?.message || "API error");
+      const replyBlocks = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
+      const callerText = replyBlocks || FALLBACK_CALL_LINES[Math.floor(Math.random() * FALLBACK_CALL_LINES.length)];
+      const callerMsg = { id: Math.random().toString(36).slice(2), sender: "caller", text: callerText, time: new Date().toISOString() };
+      setActiveCall((c) => (c ? { ...c, transcript: [...c.transcript, callerMsg] } : c));
+    } catch (e) {
+      const callerMsg = { id: Math.random().toString(36).slice(2), sender: "caller", text: FALLBACK_CALL_LINES[Math.floor(Math.random() * FALLBACK_CALL_LINES.length)], time: new Date().toISOString() };
+      setActiveCall((c) => (c ? { ...c, transcript: [...c.transcript, callerMsg] } : c));
+    } finally {
+      setCallSending(false);
+    }
+  }
+
   const selected = tickets.find((tk) => tk.id === selectedId) || null;
 
   /* ---------- derived metrics ---------- */
