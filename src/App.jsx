@@ -132,6 +132,33 @@ function pickFallback(ticket, agentText) {
 }
 
 /* ---------------------------------------------------------------------- */
+/*  PHONE CALLS — CEO / manager simulated calls                          */
+/* ---------------------------------------------------------------------- */
+
+const VIP_CALLERS = [
+  { caller: "Victoria Hale", title: "CEO", dept: "Executive", issue: "I can't get my laptop to mirror to the boardroom display and the board meeting starts in ten minutes." },
+  { caller: "Marcus Bell", title: "CFO", dept: "Finance", issue: "The financial reporting dashboard just went blank right before my investor call." },
+  { caller: "Renee Ostrowski", title: "VP of Sales", dept: "Sales", issue: "My CRM won't load and I'm about to walk into a client pitch." },
+  { caller: "David Okoye", title: "VP of Engineering", dept: "Engineering", issue: "The production deploy pipeline is stuck and I need it unblocked right now." },
+  { caller: "Sana Whitfield", title: "COO", dept: "Operations", issue: "I can't dial into the all-hands, it keeps saying 'meeting not found'." },
+  { caller: "Grant Lowery", title: "Director of Marketing", dept: "Marketing", issue: "My presentation won't open and I'm on stage in fifteen minutes." },
+];
+
+function priorityForRole(title) {
+  if (/CEO|CFO|COO|President|Chief/i.test(title)) return "Critical";
+  if (/VP|Vice President/i.test(title)) return "High";
+  return "Medium";
+}
+
+const FALLBACK_CALL_LINES = [
+  "Okay, let me know the second that's done.",
+  "I really don't have much time here, can we move faster?",
+  "Alright, I'll wait — but please hurry.",
+  "Thanks, keep me posted.",
+  "That's still not working, try something else.",
+];
+
+/* ---------------------------------------------------------------------- */
 /*  THEME TOKENS                                                          */
 /* ---------------------------------------------------------------------- */
 
