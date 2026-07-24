@@ -330,6 +330,7 @@ export default function HelpdeskSimulator() {
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [selectedId, tickets, aiTyping, detailTab]);
   useEffect(() => { termEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [termHistory]);
+  useEffect(() => { callEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [activeCall]);
 
   function pushToast(msg, kind = "info") {
     const id = Math.random().toString(36).slice(2);
